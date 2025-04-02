@@ -61,7 +61,16 @@ public actor CanvasClient {
     }
     
     public func getAssignments(courseId: Int) async throws -> [Assignment] {
-        let url = baseURL.appendingPathComponent("courses/\(courseId)/assignments")
+        var urlComponents = URLComponents(url: baseURL.appendingPathComponent("courses/\(courseId)/assignments"), resolvingAgainstBaseURL: true)!
+        urlComponents.queryItems = [
+            URLQueryItem(name: "include[]", value: "description"),
+            URLQueryItem(name: "per_page", value: "100")
+        ]
+        
+        guard let url = urlComponents.url else {
+            throw CanvasError.invalidResponse
+        }
+        
         return try await fetch([Assignment].self, from: url)
     }
     
@@ -100,6 +109,66 @@ public actor CanvasClient {
         }
         
         return try await fetch(ModuleItemContent.self, from: url)
+    }
+    
+    // MARK: - New Methods
+    
+    public func getGrades(courseId: Int) async throws -> [Grade] {
+        var urlComponents = URLComponents(url: baseURL.appendingPathComponent("courses/\(courseId)/students/submissions"), resolvingAgainstBaseURL: true)!
+        urlComponents.queryItems = [
+            URLQueryItem(name: "include[]", value: "submission_comments"),
+            URLQueryItem(name: "include[]", value: "assignment"),
+            URLQueryItem(name: "student_ids[]", value: "self"),
+            URLQueryItem(name: "per_page", value: "100")
+        ]
+        
+        guard let url = urlComponents.url else {
+            throw CanvasError.invalidResponse
+        }
+        
+        return try await fetch([Grade].self, from: url)
+    }
+    
+    public func getTodos() async throws -> [Todo] {
+        // First get courses to get valid course IDs
+        let courses = try await getCourses()
+        var todos: [Todo] = []
+        
+        // Get assignments for each course
+        for course in courses {
+            var urlComponents = URLComponents(url: baseURL.appendingPathComponent("api/v1/courses/\(course.id)/assignments"), resolvingAgainstBaseURL: true)!
+            urlComponents.queryItems = [
+                URLQueryItem(name: "needs_grading_count", value: "true"),
+                URLQueryItem(name: "include[]", value: "submission"),
+                URLQueryItem(name: "per_page", value: "100")
+            ]
+            
+            guard let url = urlComponents.url else {
+                throw CanvasError.invalidResponse
+            }
+            
+            let assignments = try await fetch([Assignment].self, from: url)
+            
+            // Convert assignments to todos
+            let assignmentTodos = assignments.map { assignment -> Todo in
+                Todo(
+                    id: assignment.id,
+                    title: assignment.name,
+                    message: assignment.description,
+                    type: "Assignment",
+                    courseId: course.id,
+                    assignmentId: assignment.id,
+                    htmlUrl: assignment.htmlUrl,
+                    createdAt: nil,
+                    updatedAt: nil,
+                    dueAt: assignment.dueAt
+                )
+            }
+            
+            todos.append(contentsOf: assignmentTodos)
+        }
+        
+        return todos
     }
     
     // MARK: - Private Methods

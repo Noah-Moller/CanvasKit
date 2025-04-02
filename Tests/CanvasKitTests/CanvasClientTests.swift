@@ -156,4 +156,69 @@ final class CanvasClientTests: XCTestCase {
             XCTFail("Unexpected error: \(error)")
         }
     }
+    
+    func testGetGrades() async throws {
+        // First get courses to get a valid course ID
+        let courses = try await client.getCourses()
+        XCTAssertFalse(courses.isEmpty, "Need at least one course for testing")
+        
+        print("\nChecking grades for all courses:")
+        for course in courses {
+            print("\nGrades for course \(course.name):")
+            let grades = try await client.getGrades(courseId: course.id)
+            
+            for grade in grades {
+                print("- Assignment ID: \(grade.assignmentId)")
+                if let score = grade.score {
+                    print("  Score: \(score)")
+                }
+                if let gradeStr = grade.grade {
+                    print("  Grade: \(gradeStr)")
+                }
+                if let comments = grade.comments {
+                    print("  Comments:")
+                    for comment in comments {
+                        print("    • \(comment.authorName): \(comment.comment)")
+                    }
+                }
+            }
+            
+            // Test grade properties if they exist
+            if let firstGrade = grades.first {
+                XCTAssertGreaterThan(firstGrade.id, 0)
+                XCTAssertGreaterThan(firstGrade.assignmentId, 0)
+            }
+        }
+    }
+    
+    func testGetTodos() async throws {
+        let todos = try await client.getTodos()
+        
+        // Print todos for debugging
+        print("\nTodos:")
+        for todo in todos {
+            print("\nTodo:")
+            print("  ID: \(todo.id)")
+            print("  Title: \(todo.title)")
+            print("  Type: \(todo.type)")
+            if let courseId = todo.courseId {
+                print("  Course ID: \(courseId)")
+            }
+            if let assignmentId = todo.assignmentId {
+                print("  Assignment ID: \(assignmentId)")
+            }
+            if let dueAt = todo.dueAt {
+                print("  Due: \(dueAt)")
+            }
+        }
+        
+        // Verify todos
+        XCTAssertFalse(todos.isEmpty, "Todos should not be empty")
+        
+        if let firstTodo = todos.first {
+            XCTAssertGreaterThan(firstTodo.id, 0)
+            XCTAssertFalse(firstTodo.title.isEmpty)
+            XCTAssertFalse(firstTodo.type.isEmpty)
+        }
+    }
 } 

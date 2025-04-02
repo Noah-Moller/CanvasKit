@@ -11,13 +11,21 @@ public struct CanvasKitDemoView: View {
     public var body: some View {
         NavigationView {
             List {
-                ForEach(viewModel.courses) { course in
-                    NavigationLink(destination: CourseDetailView(course: course, viewModel: viewModel)) {
-                        CourseRowView(course: course)
+                Section("Courses") {
+                    ForEach(viewModel.courses) { course in
+                        NavigationLink(destination: CourseDetailView(course: course, viewModel: viewModel)) {
+                            CourseRowView(course: course)
+                        }
+                    }
+                }
+                
+                Section {
+                    NavigationLink(destination: TodoListView(viewModel: viewModel)) {
+                        Label("Todos", systemImage: "checklist")
                     }
                 }
             }
-            .navigationTitle("Canvas Courses")
+            .navigationTitle("Canvas")
             .task {
                 await viewModel.loadCourses()
             }
@@ -78,11 +86,50 @@ private struct CourseDetailView: View {
                     }
                 }
             }
+            
+            Section("Grades") {
+                ForEach(viewModel.grades) { grade in
+                    VStack(alignment: .leading) {
+                        if let assignment = viewModel.assignments.first(where: { $0.id == grade.assignmentId }) {
+                            Text(assignment.name)
+                                .font(.headline)
+                        }
+                        HStack {
+                            if let score = grade.score {
+                                Text("Score: \(score, specifier: "%.1f")")
+                                    .font(.subheadline)
+                            }
+                            if let gradeStr = grade.grade {
+                                Text("Grade: \(gradeStr)")
+                                    .font(.subheadline)
+                            }
+                        }
+                        .foregroundColor(.secondary)
+                        
+                        if let comments = grade.comments, !comments.isEmpty {
+                            DisclosureGroup("Comments") {
+                                ForEach(comments, id: \.id) { comment in
+                                    VStack(alignment: .leading) {
+                                        Text(comment.authorName)
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        Text(comment.comment)
+                                            .font(.body)
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
         }
         .navigationTitle(course.name)
         .task {
             await viewModel.loadModules(for: course.id)
             await viewModel.loadAssignments(for: course.id)
+            await viewModel.loadGrades(for: course.id)
         }
     }
 }
@@ -151,6 +198,8 @@ class CanvasKitDemoViewModel: ObservableObject {
     @Published var modules: [Module] = []
     @Published var assignments: [Assignment] = []
     @Published var moduleItemContents: [Int: ModuleItemContent] = [:]
+    @Published var grades: [Grade] = []
+    @Published var todos: [Todo] = []
     @Published var showError = false
     @Published var errorMessage = ""
     @Published var loadingItemId: Int?
@@ -196,6 +245,60 @@ class CanvasKitDemoViewModel: ObservableObject {
         } catch {
             showError = true
             errorMessage = error.localizedDescription
+        }
+    }
+    
+    func loadGrades(for courseId: Int) async {
+        do {
+            grades = try await client.getGrades(courseId: courseId)
+        } catch {
+            showError = true
+            errorMessage = error.localizedDescription
+        }
+    }
+    
+    func loadTodos() async {
+        do {
+            todos = try await client.getTodos()
+        } catch {
+            showError = true
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+@MainActor
+private struct TodoListView: View {
+    @ObservedObject var viewModel: CanvasKitDemoViewModel
+    
+    var body: some View {
+        List {
+            ForEach(viewModel.todos) { todo in
+                VStack(alignment: .leading) {
+                    Text(todo.title)
+                        .font(.headline)
+                    if let courseId = todo.courseId, let course = viewModel.courses.first(where: { $0.id == courseId }) {
+                        Text("Course: \(course.name)")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    if let dueAt = todo.dueAt {
+                        Text("Due: \(dueAt, style: .date)")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    if let message = todo.message {
+                        Text(message)
+                            .font(.body)
+                            .padding(.top, 4)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+        }
+        .navigationTitle("Todos")
+        .task {
+            await viewModel.loadTodos()
         }
     }
 } 
