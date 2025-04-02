@@ -29,12 +29,34 @@ public actor CanvasClient {
     // MARK: - API Methods
     
     public func getCourses() async throws -> [Course] {
-        let url = baseURL.appendingPathComponent("courses")
+        var urlComponents = URLComponents(url: baseURL.appendingPathComponent("courses"), resolvingAgainstBaseURL: true)!
+        urlComponents.queryItems = [
+            URLQueryItem(name: "enrollment_state", value: "active"),
+            URLQueryItem(name: "enrollment_type", value: "student"),
+            URLQueryItem(name: "state[]", value: "available"),
+            URLQueryItem(name: "include[]", value: "term"),
+            URLQueryItem(name: "per_page", value: "100")
+        ]
+        
+        guard let url = urlComponents.url else {
+            throw CanvasError.invalidResponse
+        }
+        
         return try await fetch([Course].self, from: url)
     }
     
     public func getModules(courseId: Int) async throws -> [Module] {
-        let url = baseURL.appendingPathComponent("courses/\(courseId)/modules")
+        var urlComponents = URLComponents(url: baseURL.appendingPathComponent("courses/\(courseId)/modules"), resolvingAgainstBaseURL: true)!
+        urlComponents.queryItems = [
+            URLQueryItem(name: "include[]", value: "items"),
+            URLQueryItem(name: "include[]", value: "content_details"),
+            URLQueryItem(name: "per_page", value: "100")
+        ]
+        
+        guard let url = urlComponents.url else {
+            throw CanvasError.invalidResponse
+        }
+        
         return try await fetch([Module].self, from: url)
     }
     
@@ -44,19 +66,35 @@ public actor CanvasClient {
     }
     
     public func getModuleItemContent(courseId: Int, moduleItem: ModuleItem) async throws -> ModuleItemContent {
+        guard let contentId = moduleItem.contentId else {
+            // For items without content ID (like external URLs), return a basic content object
+            return ModuleItemContent(
+                id: moduleItem.id,
+                title: moduleItem.title,
+                description: nil,
+                content: nil,
+                htmlContent: nil,
+                url: moduleItem.externalUrl ?? moduleItem.url ?? moduleItem.htmlUrl,
+                fileUrl: nil,
+                mimeType: nil,
+                createdAt: Date(),
+                updatedAt: Date()
+            )
+        }
+        
         // Build URL based on item type
         let url: URL
         switch moduleItem.type.lowercased() {
         case "assignment":
-            url = baseURL.appendingPathComponent("courses/\(courseId)/assignments/\(moduleItem.contentId)")
+            url = baseURL.appendingPathComponent("courses/\(courseId)/assignments/\(contentId)")
         case "quiz":
-            url = baseURL.appendingPathComponent("courses/\(courseId)/quizzes/\(moduleItem.contentId)")
+            url = baseURL.appendingPathComponent("courses/\(courseId)/quizzes/\(contentId)")
         case "discussion_topic":
-            url = baseURL.appendingPathComponent("courses/\(courseId)/discussion_topics/\(moduleItem.contentId)")
+            url = baseURL.appendingPathComponent("courses/\(courseId)/discussion_topics/\(contentId)")
         case "file":
-            url = baseURL.appendingPathComponent("courses/\(courseId)/files/\(moduleItem.contentId)")
+            url = baseURL.appendingPathComponent("courses/\(courseId)/files/\(contentId)")
         case "page":
-            url = baseURL.appendingPathComponent("courses/\(courseId)/pages/\(moduleItem.contentId)")
+            url = baseURL.appendingPathComponent("courses/\(courseId)/pages/\(moduleItem.pageUrl ?? String(contentId))")
         default:
             throw CanvasError.unsupportedModuleItemType(moduleItem.type)
         }

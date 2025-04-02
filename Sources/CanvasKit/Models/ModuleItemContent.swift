@@ -15,6 +15,8 @@ public struct ModuleItemContent: Codable, Identifiable, Sendable {
     enum CodingKeys: String, CodingKey {
         case id
         case title
+        case name
+        case displayName = "display_name"
         case description
         case content = "body"
         case htmlContent = "html_content"
@@ -25,6 +27,19 @@ public struct ModuleItemContent: Codable, Identifiable, Sendable {
         case updatedAt = "updated_at"
     }
     
+    public init(id: Int, title: String, description: String?, content: String?, htmlContent: String?, url: String?, fileUrl: String?, mimeType: String?, createdAt: Date, updatedAt: Date) {
+        self.id = id
+        self.title = title
+        self.description = description
+        self.content = content
+        self.htmlContent = htmlContent
+        self.url = url
+        self.fileUrl = fileUrl
+        self.mimeType = mimeType
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+    
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         
@@ -32,7 +47,9 @@ public struct ModuleItemContent: Codable, Identifiable, Sendable {
         id = try container.decode(Int.self, forKey: .id)
         
         // Try different possible title keys based on content type
-        if let name = try? container.decode(String.self, forKey: .title) {
+        if let displayName = try? container.decode(String.self, forKey: .displayName) {
+            title = displayName
+        } else if let name = try? container.decode(String.self, forKey: .name) {
             title = name
         } else {
             title = try container.decode(String.self, forKey: .title)
@@ -67,5 +84,39 @@ public struct ModuleItemContent: Codable, Identifiable, Sendable {
         // Dates
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+    }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        
+        try container.encode(id, forKey: .id)
+        try container.encode(title, forKey: .title)
+        
+        if let description = description {
+            try container.encode(description, forKey: .description)
+        }
+        
+        if let content = content {
+            try container.encode(content, forKey: .content)
+        }
+        
+        if let htmlContent = htmlContent {
+            try container.encode(htmlContent, forKey: .htmlContent)
+        }
+        
+        if let url = url {
+            try container.encode(url, forKey: .url)
+        }
+        
+        if let fileUrl = fileUrl {
+            try container.encode(fileUrl, forKey: .fileUrl)
+        }
+        
+        if let mimeType = mimeType {
+            try container.encode(mimeType, forKey: .mimeType)
+        }
+        
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(updatedAt, forKey: .updatedAt)
     }
 } 
