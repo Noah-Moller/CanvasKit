@@ -1,107 +1,116 @@
 # CanvasKit
 
-A Swift package for easily interfacing with the Canvas LMS API. This package provides a simple way to access Canvas courses, modules, and assignments data, along with a SwiftUI demo view to showcase the functionality.
+A Swift package for interacting with the Canvas LMS API. Built with modern Swift features and SwiftUI integration.
 
-## Requirements
+## Documentation
 
-- iOS 15.0+ / macOS 12.0+
-- Swift 6.1+
-- Canvas API Token
+[Documentation](docs)
+
+## Features
+
+- ✨ Modern Swift API using async/await
+- 🔒 Type-safe API client
+- 📱 SwiftUI integration
+- 🧪 Comprehensive test coverage
+- 📚 Extensive documentation
 
 ## Installation
+
+### Swift Package Manager
 
 Add CanvasKit to your Swift package dependencies:
 
 ```swift
 dependencies: [
-    .package(url: "YOUR_REPOSITORY_URL", from: "1.0.0")
+    .package(url: "https://github.com/Noah-Moller/CanvasKit.git", from: "1.0.0")
 ]
 ```
 
-## Usage
+### Requirements
 
-### Initialize the Client
+- iOS 15.0+ / macOS 12.0+
+- Swift 5.5+
+- Xcode 13.0+
+
+## Quick Start
 
 ```swift
 import CanvasKit
 
+// Initialize client
 let client = CanvasClient(
-    domain: "your-institution.instructure.com",
-    token: "your-canvas-api-token"
+    domain: "your-canvas-domain.com",
+    token: "your-api-token"
 )
-```
 
-### Fetch Courses
+// Fetch courses
+let courses = try await client.getCourses()
 
-```swift
-do {
-    let courses = try await client.getCourses()
-    for course in courses {
-        print(course.name)
+// Display courses in SwiftUI
+struct CourseList: View {
+    @StateObject private var viewModel: CourseViewModel
+    
+    var body: some View {
+        List(viewModel.courses) { course in
+            Text(course.name)
+        }
+        .task {
+            await viewModel.loadCourses()
+        }
     }
-} catch {
-    print("Error: \(error)")
 }
 ```
 
-### Fetch Modules
+## Example App
 
-```swift
-do {
-    let modules = try await client.getModules(courseId: courseId)
-    for module in modules {
-        print(module.name)
-    }
-} catch {
-    print("Error: \(error)")
-}
-```
-
-### Fetch Assignments
-
-```swift
-do {
-    let assignments = try await client.getAssignments(courseId: courseId)
-    for assignment in assignments {
-        print(assignment.name)
-    }
-} catch {
-    print("Error: \(error)")
-}
-```
-
-### Use the Demo View
+The package includes a demo app showcasing common use cases:
 
 ```swift
 import SwiftUI
 import CanvasKit
 
-struct ContentView: View {
-    let client = CanvasClient(
-        domain: "your-institution.instructure.com",
-        token: "your-canvas-api-token"
-    )
-    
-    var body: some View {
-        CanvasKitDemoView(client: client)
+@main
+struct CanvasKitDemo: App {
+    var body: some Scene {
+        WindowGroup {
+            CanvasKitDemoView()
+        }
     }
 }
 ```
 
 ## Features
 
-- Fetch courses information
-- Fetch course modules
-- Fetch course assignments
-- SwiftUI demo view
-- Async/await API
-- Error handling
-- Type-safe models
+### Course Management
 
-## Note
+- Fetch course list
+- View course details
+- Access course modules
 
-This package requires a Canvas API token. You can generate one in your Canvas account settings. The token should have appropriate permissions to access the required endpoints.
+### Module Support
+
+- List modules
+- View module items
+- Access module content
+
+### Assignment Integration
+
+- List assignments
+- View assignment details
+- Check grades and comments
+
+### Error Handling
+
+- Type-safe error handling
+- User-friendly error messages
+- Automatic retry for transient failures
+
+### SwiftUI Integration
+
+- Ready-to-use SwiftUI views
+- MVVM architecture
+- State management
 
 ## License
 
-This project is available under the MIT license. 
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

@@ -7,8 +7,8 @@ final class CanvasClientTests: XCTestCase {
     override func setUp() {
         super.setUp()
         client = CanvasClient(
-            domain: "saac.instructure.com",
-            token: "8070~ETJMArXrv6uZMRVHU62DNNKXkL2RxakRUM86aYk7BUYmRHXNKtxz7UF4w46xtuyC"
+            domain: "your-canvas-domain.com",
+            token: "your-api-token"
         )
     }
     
