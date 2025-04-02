@@ -20,8 +20,8 @@ public struct CanvasKitDemoView: View {
                 }
                 
                 Section {
-                    NavigationLink(destination: TodoListView(viewModel: viewModel)) {
-                        Label("Todos", systemImage: "checklist")
+                    NavigationLink(destination: UpcomingView(viewModel: viewModel)) {
+                        Label("Upcoming", systemImage: "calendar")
                     }
                 }
             }
@@ -191,6 +191,47 @@ private struct ModuleItemView: View {
 }
 
 @MainActor
+private struct UpcomingView: View {
+    @ObservedObject var viewModel: CanvasKitDemoViewModel
+    
+    var body: some View {
+        List {
+            if viewModel.upcomingAssignments.isEmpty {
+                Text("No upcoming assignments")
+                    .foregroundColor(.secondary)
+            } else {
+                ForEach(viewModel.upcomingAssignments) { assignment in
+                    VStack(alignment: .leading) {
+                        Text(assignment.name)
+                            .font(.headline)
+                        if let course = viewModel.courses.first(where: { $0.id == assignment.courseId }) {
+                            Text("Course: \(course.name)")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        if let dueAt = assignment.dueAt {
+                            Text("Due: \(dueAt, style: .date)")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        if let description = assignment.description {
+                            Text(description)
+                                .font(.body)
+                                .padding(.top, 4)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+        }
+        .navigationTitle("Upcoming")
+        .task {
+            await viewModel.loadAllAssignments()
+        }
+    }
+}
+
+@MainActor
 class CanvasKitDemoViewModel: ObservableObject {
     private let client: CanvasClient
     
@@ -199,10 +240,22 @@ class CanvasKitDemoViewModel: ObservableObject {
     @Published var assignments: [Assignment] = []
     @Published var moduleItemContents: [Int: ModuleItemContent] = [:]
     @Published var grades: [Grade] = []
-    @Published var todos: [Todo] = []
     @Published var showError = false
     @Published var errorMessage = ""
     @Published var loadingItemId: Int?
+    
+    var upcomingAssignments: [Assignment] {
+        let now = Date()
+        return assignments
+            .filter { assignment in
+                guard let dueAt = assignment.dueAt else { return false }
+                return dueAt > now
+            }
+            .sorted { a, b in
+                guard let aDate = a.dueAt, let bDate = b.dueAt else { return false }
+                return aDate < bDate
+            }
+    }
     
     init(client: CanvasClient) {
         self.client = client
@@ -257,48 +310,16 @@ class CanvasKitDemoViewModel: ObservableObject {
         }
     }
     
-    func loadTodos() async {
+    func loadAllAssignments() async {
         do {
-            todos = try await client.getTodos()
+            assignments.removeAll()
+            for course in courses {
+                let courseAssignments = try await client.getAssignments(courseId: course.id)
+                assignments.append(contentsOf: courseAssignments)
+            }
         } catch {
             showError = true
             errorMessage = error.localizedDescription
-        }
-    }
-}
-
-@MainActor
-private struct TodoListView: View {
-    @ObservedObject var viewModel: CanvasKitDemoViewModel
-    
-    var body: some View {
-        List {
-            ForEach(viewModel.todos) { todo in
-                VStack(alignment: .leading) {
-                    Text(todo.title)
-                        .font(.headline)
-                    if let courseId = todo.courseId, let course = viewModel.courses.first(where: { $0.id == courseId }) {
-                        Text("Course: \(course.name)")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                    if let dueAt = todo.dueAt {
-                        Text("Due: \(dueAt, style: .date)")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                    if let message = todo.message {
-                        Text(message)
-                            .font(.body)
-                            .padding(.top, 4)
-                    }
-                }
-                .padding(.vertical, 4)
-            }
-        }
-        .navigationTitle("Todos")
-        .task {
-            await viewModel.loadTodos()
         }
     }
 } 
