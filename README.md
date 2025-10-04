@@ -345,7 +345,6 @@ struct CanvasWithToolbar: View {
 
 - iOS 17.0+ / visionOS 1.0+
 - Swift 6.0+
-- PencilKit framework
 
 ## License
 
