@@ -27,6 +27,9 @@ public class CanvasCoordinator: NSObject {
     /// Model context for SwiftData operations
     public var modelContext: ModelContext?
     
+    /// Weak reference to canvas view for tool management
+    public weak var canvasView: PKCanvasView?
+    
     /// Current zoom scale
     public var currentZoomScale: CGFloat = 1.0
     
@@ -35,6 +38,13 @@ public class CanvasCoordinator: NSObject {
     
     /// Drawing change tracking
     private var hasUnsavedChanges = false
+    
+    /// Callback for when drawing changes (for Data binding updates)
+    public var onDrawingChangedCallback: ((PKDrawing) -> Void)?
+    
+    /// Undo/redo state tracking
+    public var canUndo: Bool = false
+    public var canRedo: Bool = false
     
     // MARK: - Configuration
     
@@ -104,8 +114,17 @@ public class CanvasCoordinator: NSObject {
 
 extension CanvasCoordinator: PKCanvasViewDelegate {
     public func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
+        // Store reference to canvas view
+        self.canvasView = canvasView
+        
+        // Update undo/redo state
+        updateUndoRedoState(canvasView)
+        
         // Mark as changed for auto-save
         markAsChanged()
+        
+        // Call drawing changed callback for Data binding updates
+        onDrawingChangedCallback?(canvasView.drawing)
         
         // Update parent with new drawing
         if let canvasDelegate = parent as? CanvasViewDelegate {
@@ -115,12 +134,15 @@ extension CanvasCoordinator: PKCanvasViewDelegate {
     }
     
     public func canvasViewDidBeginUsingTool(_ canvasView: PKCanvasView) {
+        self.canvasView = canvasView
         if let canvasDelegate = parent as? CanvasViewDelegate {
             canvasDelegate.onToolBegan?()
         }
     }
     
     public func canvasViewDidEndUsingTool(_ canvasView: PKCanvasView) {
+        self.canvasView = canvasView
+        updateUndoRedoState(canvasView)
         if let canvasDelegate = parent as? CanvasViewDelegate {
             canvasDelegate.onToolEnded?()
         }
@@ -141,6 +163,10 @@ extension CanvasCoordinator: UIScrollViewDelegate {
     
     public func scrollViewDidScroll(_ scrollView: UIScrollView) {
         // Notify parent of scroll changes if needed
+    }
+    
+    public func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
+        currentZoomScale = scale
     }
     
     public func viewForZooming(in scrollView: UIScrollView) -> UIView? {
@@ -164,30 +190,46 @@ extension CanvasCoordinator {
         markAsChanged()
     }
     
+    /// Update undo/redo state
+    private func updateUndoRedoState(_ canvasView: PKCanvasView) {
+        canUndo = canvasView.undoManager?.canUndo == true
+        canRedo = canvasView.undoManager?.canRedo == true
+    }
+    
     /// Undo the last action
-    public func undo(_ canvasView: PKCanvasView) {
-        if canvasView.undoManager?.canUndo == true {
-            canvasView.undoManager?.undo()
-            markAsChanged()
-        }
+    public func undo(_ canvasView: PKCanvasView? = nil) {
+        let view = canvasView ?? self.canvasView
+        guard let view = view, view.undoManager?.canUndo == true else { return }
+        view.undoManager?.undo()
+        updateUndoRedoState(view)
+        markAsChanged()
     }
     
     /// Redo the last undone action
-    public func redo(_ canvasView: PKCanvasView) {
-        if canvasView.undoManager?.canRedo == true {
-            canvasView.undoManager?.redo()
-            markAsChanged()
-        }
+    public func redo(_ canvasView: PKCanvasView? = nil) {
+        let view = canvasView ?? self.canvasView
+        guard let view = view, view.undoManager?.canRedo == true else { return }
+        view.undoManager?.redo()
+        updateUndoRedoState(view)
+        markAsChanged()
     }
     
     /// Check if undo is available
-    public func canUndo(_ canvasView: PKCanvasView) -> Bool {
-        return canvasView.undoManager?.canUndo == true
+    public func checkCanUndo(_ canvasView: PKCanvasView? = nil) -> Bool {
+        let view = canvasView ?? self.canvasView
+        guard let view = view else { return false }
+        let canUndoValue = view.undoManager?.canUndo == true
+        canUndo = canUndoValue
+        return canUndoValue
     }
     
     /// Check if redo is available
-    public func canRedo(_ canvasView: PKCanvasView) -> Bool {
-        return canvasView.undoManager?.canRedo == true
+    public func checkCanRedo(_ canvasView: PKCanvasView? = nil) -> Bool {
+        let view = canvasView ?? self.canvasView
+        guard let view = view else { return false }
+        let canRedoValue = view.undoManager?.canRedo == true
+        canRedo = canRedoValue
+        return canRedoValue
     }
 }
 
@@ -195,13 +237,15 @@ extension CanvasCoordinator {
 
 extension CanvasCoordinator {
     /// Set the current tool
-    public func setTool(_ tool: PKTool, in canvasView: PKCanvasView) {
-        canvasView.tool = tool
+    public func setTool(_ tool: PKTool, in canvasView: PKCanvasView? = nil) {
+        let view = canvasView ?? self.canvasView
+        view?.tool = tool
     }
     
     /// Get the current tool
-    public func getCurrentTool(from canvasView: PKCanvasView) -> PKTool {
-        return canvasView.tool
+    public func getCurrentTool(from canvasView: PKCanvasView? = nil) -> PKTool? {
+        let view = canvasView ?? self.canvasView
+        return view?.tool
     }
     
     /// Create a pen tool with custom properties

@@ -62,13 +62,14 @@ public struct WhiteboardCanvasDataView: UIViewRepresentable {
         let scrollView = UIScrollView()
         let canvasView = PKCanvasView()
         
-        // Configure scroll view for infinite canvas
+        // Configure scroll view for infinite canvas with zoom
         scrollView.delegate = context.coordinator
         scrollView.minimumZoomScale = settings.zoomRange.lowerBound
         scrollView.maximumZoomScale = settings.zoomRange.upperBound
         scrollView.zoomScale = settings.defaultZoom
         scrollView.showsVerticalScrollIndicator = false
         scrollView.showsHorizontalScrollIndicator = false
+        scrollView.bouncesZoom = true
         
         #if canImport(UIKit)
         scrollView.backgroundColor = whiteboard.backgroundUIColor
@@ -84,7 +85,7 @@ public struct WhiteboardCanvasDataView: UIViewRepresentable {
         
         // Configure canvas view
         canvasView.delegate = context.coordinator
-        canvasView.drawingPolicy = .anyInput
+        canvasView.drawingPolicy = settings.enablePalmRejection ? .pencilOnly : .anyInput
         canvasView.isOpaque = false
         canvasView.backgroundColor = UIColor.clear
         canvasView.drawing = whiteboard.drawing
@@ -104,8 +105,23 @@ public struct WhiteboardCanvasDataView: UIViewRepresentable {
             canvasView.heightAnchor.constraint(equalToConstant: whiteboard.contentSize.height)
         ])
         
-        // Configure coordinator
-        context.coordinator.parent = nil
+        // Store references in coordinator
+        context.coordinator.canvasView = canvasView
+        
+        // Set up drawing change callback to update Data binding
+        let parent = self
+        context.coordinator.onDrawingChangedCallback = { drawing in
+            var updatedWhiteboard = parent.whiteboard
+            updatedWhiteboard.drawing = drawing
+            // Expand content size if needed
+            updatedWhiteboard.expandContentSizeIfNeeded()
+            parent.canvasData = updatedWhiteboard.toData()
+        }
+        
+        // Add double tap gesture to reset zoom
+        let doubleTapGesture = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.resetZoom))
+        doubleTapGesture.numberOfTapsRequired = 2
+        scrollView.addGestureRecognizer(doubleTapGesture)
         
         // Center the canvas initially
         DispatchQueue.main.async {
@@ -121,22 +137,20 @@ public struct WhiteboardCanvasDataView: UIViewRepresentable {
         guard let canvasView = scrollView.subviews.first as? PKCanvasView else { return }
         
         // Update drawing
-        canvasView.drawing = whiteboard.drawing
+        if canvasView.drawing != whiteboard.drawing {
+            canvasView.drawing = whiteboard.drawing
+        }
         
         // Update content size if it changed
         if scrollView.contentSize != whiteboard.contentSize {
             scrollView.contentSize = whiteboard.contentSize
             
             // Update canvas view constraints
-            canvasView.removeFromSuperview()
-            scrollView.addSubview(canvasView)
-            canvasView.translatesAutoresizingMaskIntoConstraints = false
-            NSLayoutConstraint.activate([
-                canvasView.topAnchor.constraint(equalTo: scrollView.topAnchor),
-                canvasView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
-                canvasView.widthAnchor.constraint(equalToConstant: whiteboard.contentSize.width),
-                canvasView.heightAnchor.constraint(equalToConstant: whiteboard.contentSize.height)
-            ])
+            if let widthConstraint = canvasView.constraints.first(where: { $0.firstAttribute == .width }),
+               widthConstraint.constant != whiteboard.contentSize.width {
+                widthConstraint.constant = whiteboard.contentSize.width
+                canvasView.constraints.first(where: { $0.firstAttribute == .height })?.constant = whiteboard.contentSize.height
+            }
         }
         
         // Update settings
@@ -149,11 +163,39 @@ public struct WhiteboardCanvasDataView: UIViewRepresentable {
         #endif
         
         // Update coordinator
-        context.coordinator.parent = nil
+        context.coordinator.canvasView = canvasView
+        
+        // Update drawing change callback
+        let parent = self
+        context.coordinator.onDrawingChangedCallback = { drawing in
+            var updatedWhiteboard = parent.whiteboard
+            updatedWhiteboard.drawing = drawing
+            // Expand content size if needed
+            updatedWhiteboard.expandContentSizeIfNeeded()
+            parent.canvasData = updatedWhiteboard.toData()
+        }
     }
     
-    public func makeCoordinator() -> CanvasCoordinator {
-        return CanvasCoordinator(parent: nil)
+    public func makeCoordinator() -> Coordinator {
+        return Coordinator(parent: self)
+    }
+    
+    // MARK: - Coordinator
+    
+    public class Coordinator: CanvasCoordinator {
+        var parent: WhiteboardCanvasDataView
+        
+        init(parent: WhiteboardCanvasDataView) {
+            self.parent = parent
+            super.init(parent: nil)
+        }
+        
+        @objc func resetZoom(_ gesture: UITapGestureRecognizer) {
+            guard let scrollView = gesture.view as? UIScrollView else { return }
+            UIView.animate(withDuration: 0.3) {
+                scrollView.zoomScale = self.parent.settings.defaultZoom
+            }
+        }
     }
     
     // MARK: - Public Methods
@@ -277,6 +319,25 @@ extension WhiteboardCanvasDataView {
     public func notifyDrawingChanged() {
         // The whiteboard model is already updated through the binding
         // This method is called by the coordinator after drawing changes
+    }
+}
+
+// MARK: - Public Zoom Methods
+
+extension WhiteboardCanvasDataView {
+    /// Zoom in
+    public func zoomIn() {
+        // This will be handled by the wrapper view
+    }
+    
+    /// Zoom out
+    public func zoomOut() {
+        // This will be handled by the wrapper view
+    }
+    
+    /// Reset zoom
+    public func resetZoom() {
+        // This will be handled by the wrapper view
     }
 }
 

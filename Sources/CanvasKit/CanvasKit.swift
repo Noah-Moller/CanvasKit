@@ -14,7 +14,7 @@ import UIKit
 /// Main CanvasKit module
 public struct CanvasKit {
     /// CanvasKit version
-    public static let version = "1.0.0"
+    public static let version = "2.0.0"
     
     /// Initialize CanvasKit
     public static func initialize() {
@@ -195,6 +195,40 @@ public func whiteboardDataToData(_ whiteboard: WhiteboardCanvasData) -> Data {
 public func canvasDataToData(_ canvas: CanvasData) -> Data {
     return canvas.toData()
 }
+
+// MARK: - High-Level View Convenience Functions
+
+#if canImport(UIKit)
+/// Create a complete notebook view with toolbar and page navigation
+/// This is the recommended way to use CanvasKit for notebook experiences
+public func createNotebookView(
+    canvasData: Binding<Data>,
+    settings: CanvasSettings = CanvasSettings(zoomRange: 0.5...3.0, defaultZoom: 1.0),
+    onDataChanged: ((Data) -> Void)? = nil,
+    onPageChanged: ((Int) -> Void)? = nil
+) -> NotebookView {
+    return NotebookView(
+        canvasData: canvasData,
+        settings: settings,
+        onDataChanged: onDataChanged,
+        onPageChanged: onPageChanged
+    )
+}
+
+/// Create a complete canvas/whiteboard view with toolbar
+/// This is the recommended way to use CanvasKit for freeform canvas experiences
+public func createCanvasView(
+    canvasData: Binding<Data>,
+    settings: CanvasSettings = CanvasSettings(zoomRange: 0.1...5.0, defaultZoom: 1.0),
+    onDataChanged: ((Data) -> Void)? = nil
+) -> CanvasView {
+    return CanvasView(
+        canvasData: canvasData,
+        settings: settings,
+        onDataChanged: onDataChanged
+    )
+}
+#endif
 
 // MARK: - View Extensions
 
