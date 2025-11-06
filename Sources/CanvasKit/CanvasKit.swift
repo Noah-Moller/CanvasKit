@@ -204,8 +204,8 @@ public func canvasDataToData(_ canvas: CanvasData) -> Data {
 public func createNotebookView(
     canvasData: Binding<Data>,
     settings: CanvasSettings = CanvasSettings(zoomRange: 0.5...3.0, defaultZoom: 1.0),
-    onDataChanged: ((Data) -> Void)? = nil,
-    onPageChanged: ((Int) -> Void)? = nil
+    onDataChanged: (@Sendable (Data) -> Void)? = nil,
+    onPageChanged: (@Sendable (Int) -> Void)? = nil
 ) -> NotebookView {
     return NotebookView(
         canvasData: canvasData,
@@ -220,7 +220,7 @@ public func createNotebookView(
 public func createCanvasView(
     canvasData: Binding<Data>,
     settings: CanvasSettings = CanvasSettings(zoomRange: 0.1...5.0, defaultZoom: 1.0),
-    onDataChanged: ((Data) -> Void)? = nil
+    onDataChanged: (@Sendable (Data) -> Void)? = nil
 ) -> CanvasView {
     return CanvasView(
         canvasData: canvasData,

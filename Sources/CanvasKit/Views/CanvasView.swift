@@ -36,7 +36,7 @@ public struct CanvasView: View {
     public var settings: CanvasSettings = CanvasSettings(zoomRange: 0.1...5.0, defaultZoom: 1.0)
     
     /// Callbacks
-    public var onDataChanged: ((Data) -> Void)?
+    public var onDataChanged: (@Sendable (Data) -> Void)?
     
     // MARK: - Computed Properties
     

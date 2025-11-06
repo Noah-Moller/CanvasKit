@@ -36,8 +36,8 @@ public struct NotebookView: View {
     public var settings: CanvasSettings = CanvasSettings(zoomRange: 0.5...3.0, defaultZoom: 1.0)
     
     /// Callbacks
-    public var onDataChanged: ((Data) -> Void)?
-    public var onPageChanged: ((Int) -> Void)?
+    public var onDataChanged: (@Sendable (Data) -> Void)?
+    public var onPageChanged: (@Sendable (Int) -> Void)?
     
     // MARK: - Computed Properties
     
