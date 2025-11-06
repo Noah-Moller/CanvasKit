@@ -55,7 +55,7 @@ public struct CanvasView: View {
     public init(
         canvasData: Binding<Data>,
         settings: CanvasSettings = CanvasSettings(zoomRange: 0.1...5.0, defaultZoom: 1.0),
-        onDataChanged: ((Data) -> Void)? = nil
+        onDataChanged: (@Sendable (Data) -> Void)? = nil
     ) {
         self._canvasData = canvasData
         self.settings = settings
@@ -253,7 +253,7 @@ public struct CanvasView: View {
     public init(
         canvasData: Binding<Data>,
         settings: CanvasSettings = CanvasSettings(zoomRange: 0.1...5.0, defaultZoom: 1.0),
-        onDataChanged: ((Data) -> Void)? = nil
+        onDataChanged: (@Sendable (Data) -> Void)? = nil
     ) {}
 }
 #endif

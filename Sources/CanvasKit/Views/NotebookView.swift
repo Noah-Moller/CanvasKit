@@ -56,8 +56,8 @@ public struct NotebookView: View {
     public init(
         canvasData: Binding<Data>,
         settings: CanvasSettings = CanvasSettings(zoomRange: 0.5...3.0, defaultZoom: 1.0),
-        onDataChanged: ((Data) -> Void)? = nil,
-        onPageChanged: ((Int) -> Void)? = nil
+        onDataChanged: (@Sendable (Data) -> Void)? = nil,
+        onPageChanged: (@Sendable (Int) -> Void)? = nil
     ) {
         self._canvasData = canvasData
         self.settings = settings
@@ -261,8 +261,8 @@ public struct NotebookView: View {
     public init(
         canvasData: Binding<Data>,
         settings: CanvasSettings = CanvasSettings(zoomRange: 0.5...3.0, defaultZoom: 1.0),
-        onDataChanged: ((Data) -> Void)? = nil,
-        onPageChanged: ((Int) -> Void)? = nil
+        onDataChanged: (@Sendable (Data) -> Void)? = nil,
+        onPageChanged: (@Sendable (Int) -> Void)? = nil
     ) {}
 }
 #endif
