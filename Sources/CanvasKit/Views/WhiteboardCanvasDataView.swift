@@ -127,8 +127,13 @@ public struct WhiteboardCanvasDataView: UIViewRepresentable {
         doubleTapGesture.numberOfTapsRequired = 2
         scrollView.addGestureRecognizer(doubleTapGesture)
         
-        // Center the canvas initially (after layout)
+        // Ensure layout after view appears
         DispatchQueue.main.async {
+            scrollView.setNeedsLayout()
+            scrollView.layoutIfNeeded()
+            canvasView.setNeedsDisplay()
+            
+            // Center the canvas initially (after layout)
             guard scrollView.bounds.width > 0 && scrollView.bounds.height > 0 else {
                 // If bounds not ready, set content offset to (0,0) to show top-left
                 scrollView.contentOffset = .zero

@@ -70,10 +70,11 @@ public struct DocumentCanvasDataView: UIViewRepresentable {
         scrollView.minimumZoomScale = settings.zoomRange.lowerBound
         scrollView.maximumZoomScale = settings.zoomRange.upperBound
         scrollView.zoomScale = settings.defaultZoom
-        scrollView.showsVerticalScrollIndicator = false
-        scrollView.showsHorizontalScrollIndicator = false
-        scrollView.backgroundColor = UIColor.systemBackground
+        scrollView.showsVerticalScrollIndicator = true
+        scrollView.showsHorizontalScrollIndicator = true
+        scrollView.backgroundColor = UIColor.systemGray5
         scrollView.bouncesZoom = true
+        scrollView.isScrollEnabled = true
         
         // Configure canvas view
         canvasView.delegate = context.coordinator
@@ -81,13 +82,21 @@ public struct DocumentCanvasDataView: UIViewRepresentable {
         canvasView.isOpaque = true
         canvasView.backgroundColor = UIColor.white
         
-        // Get current page size
+        // Get current page size - ensure we have at least one page
         let pageSize: CGSize
-        if document.pages.indices.contains(currentPageIndex) {
+        if document.pages.isEmpty {
+            // If no pages, create one with default paper size
+            var updatedDocument = document
+            updatedDocument.pages = [PageData(pageNumber: 1, paperSize: document.paperSize)]
+            pageSize = document.paperSize.cgSize
+            canvasView.drawing = PKDrawing()
+        } else if document.pages.indices.contains(currentPageIndex) {
             pageSize = document.pages[currentPageIndex].pageSize
             canvasView.drawing = document.pages[currentPageIndex].drawing
         } else {
-            pageSize = document.paperSize.cgSize
+            // Fallback to first page or paper size
+            pageSize = document.pages.first?.pageSize ?? document.paperSize.cgSize
+            canvasView.drawing = document.pages.first?.drawing ?? PKDrawing()
         }
         
         // Add canvas to scroll view
@@ -104,6 +113,10 @@ public struct DocumentCanvasDataView: UIViewRepresentable {
         
         // Set scroll view content size to match page size
         scrollView.contentSize = pageSize
+        
+        // Ensure scroll view can scroll and has proper frame
+        scrollView.alwaysBounceVertical = false
+        scrollView.alwaysBounceHorizontal = false
         
         // Store references in coordinator
         context.coordinator.canvasView = canvasView
@@ -128,18 +141,29 @@ public struct DocumentCanvasDataView: UIViewRepresentable {
         doubleTapGesture.numberOfTapsRequired = 2
         scrollView.addGestureRecognizer(doubleTapGesture)
         
+        // Ensure layout after view appears
+        DispatchQueue.main.async {
+            scrollView.setNeedsLayout()
+            scrollView.layoutIfNeeded()
+            canvasView.setNeedsDisplay()
+        }
+        
         return scrollView
     }
     
     public func updateUIView(_ scrollView: UIScrollView, context: Context) {
         guard let canvasView = scrollView.subviews.first as? PKCanvasView else { return }
         
-        // Update page size if needed
+        // Update page size if needed - ensure we have at least one page
         let pageSize: CGSize
-        if document.pages.indices.contains(currentPageIndex) {
+        if document.pages.isEmpty {
+            // If no pages, use paper size
+            pageSize = document.paperSize.cgSize
+        } else if document.pages.indices.contains(currentPageIndex) {
             pageSize = document.pages[currentPageIndex].pageSize
         } else {
-            pageSize = document.paperSize.cgSize
+            // Fallback to first page or paper size
+            pageSize = document.pages.first?.pageSize ?? document.paperSize.cgSize
         }
         
         // Update canvas view constraints if page size changed
