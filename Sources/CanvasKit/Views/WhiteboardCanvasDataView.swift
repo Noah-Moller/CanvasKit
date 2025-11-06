@@ -86,8 +86,8 @@ public struct WhiteboardCanvasDataView: UIViewRepresentable {
         // Configure canvas view
         canvasView.delegate = context.coordinator
         canvasView.drawingPolicy = settings.enablePalmRejection ? .pencilOnly : .anyInput
-        canvasView.isOpaque = false
-        canvasView.backgroundColor = UIColor.clear
+        canvasView.isOpaque = true
+        canvasView.backgroundColor = UIColor.white
         canvasView.drawing = whiteboard.drawing
         
         // Set initial content size
@@ -127,8 +127,13 @@ public struct WhiteboardCanvasDataView: UIViewRepresentable {
         doubleTapGesture.numberOfTapsRequired = 2
         scrollView.addGestureRecognizer(doubleTapGesture)
         
-        // Center the canvas initially
+        // Center the canvas initially (after layout)
         DispatchQueue.main.async {
+            guard scrollView.bounds.width > 0 && scrollView.bounds.height > 0 else {
+                // If bounds not ready, set content offset to (0,0) to show top-left
+                scrollView.contentOffset = .zero
+                return
+            }
             let centerX = (whiteboard.contentSize.width - scrollView.bounds.width) / 2
             let centerY = (whiteboard.contentSize.height - scrollView.bounds.height) / 2
             scrollView.contentOffset = CGPoint(x: max(0, centerX), y: max(0, centerY))

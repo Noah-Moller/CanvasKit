@@ -78,8 +78,8 @@ public struct DocumentCanvasDataView: UIViewRepresentable {
         // Configure canvas view
         canvasView.delegate = context.coordinator
         canvasView.drawingPolicy = settings.enablePalmRejection ? .pencilOnly : .anyInput
-        canvasView.isOpaque = false
-        canvasView.backgroundColor = UIColor.clear
+        canvasView.isOpaque = true
+        canvasView.backgroundColor = UIColor.white
         
         // Get current page size
         let pageSize: CGSize
@@ -96,11 +96,14 @@ public struct DocumentCanvasDataView: UIViewRepresentable {
         // Set up constraints with proper page size
         canvasView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            canvasView.centerXAnchor.constraint(equalTo: scrollView.centerXAnchor),
-            canvasView.centerYAnchor.constraint(equalTo: scrollView.centerYAnchor),
+            canvasView.topAnchor.constraint(equalTo: scrollView.topAnchor),
+            canvasView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
             canvasView.widthAnchor.constraint(equalToConstant: pageSize.width),
             canvasView.heightAnchor.constraint(equalToConstant: pageSize.height)
         ])
+        
+        // Set scroll view content size to match page size
+        scrollView.contentSize = pageSize
         
         // Store references in coordinator
         context.coordinator.canvasView = canvasView
@@ -144,6 +147,8 @@ public struct DocumentCanvasDataView: UIViewRepresentable {
            widthConstraint.constant != pageSize.width {
             widthConstraint.constant = pageSize.width
             canvasView.constraints.first(where: { $0.firstAttribute == .height })?.constant = pageSize.height
+            // Update content size when page size changes
+            scrollView.contentSize = pageSize
         }
         
         // Update drawing if page changed
@@ -157,6 +162,11 @@ public struct DocumentCanvasDataView: UIViewRepresentable {
         // Update settings
         scrollView.minimumZoomScale = settings.zoomRange.lowerBound
         scrollView.maximumZoomScale = settings.zoomRange.upperBound
+        
+        // Ensure content size is set
+        if scrollView.contentSize != pageSize {
+            scrollView.contentSize = pageSize
+        }
         
         // Update coordinator
         context.coordinator.canvasView = canvasView
