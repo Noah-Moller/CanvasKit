@@ -17,6 +17,9 @@ public struct WhiteboardCanvasDataView: UIViewRepresentable {
     /// Canvas settings
     public var settings: CanvasSettings = CanvasSettings()
     
+    /// Current tool (optional - if not provided, uses default pen)
+    public var currentTool: PKTool?
+    
     /// Callbacks
     public var onDrawingChanged: ((PKDrawing) -> Void)?
     public var onZoomChanged: ((CGFloat) -> Void)?
@@ -41,6 +44,7 @@ public struct WhiteboardCanvasDataView: UIViewRepresentable {
     public init(
         canvasData: Binding<Data>,
         settings: CanvasSettings = CanvasSettings(),
+        currentTool: PKTool? = nil,
         onDrawingChanged: ((PKDrawing) -> Void)? = nil,
         onZoomChanged: ((CGFloat) -> Void)? = nil,
         onScrollChanged: ((CGPoint) -> Void)? = nil,
@@ -49,6 +53,7 @@ public struct WhiteboardCanvasDataView: UIViewRepresentable {
     ) {
         self._canvasData = canvasData
         self.settings = settings
+        self.currentTool = currentTool
         self.onDrawingChanged = onDrawingChanged
         self.onZoomChanged = onZoomChanged
         self.onScrollChanged = onScrollChanged
@@ -89,6 +94,14 @@ public struct WhiteboardCanvasDataView: UIViewRepresentable {
         canvasView.isOpaque = true
         canvasView.backgroundColor = UIColor.white
         canvasView.drawing = whiteboard.drawing
+        
+        // Set initial tool if provided
+        if let tool = currentTool {
+            canvasView.tool = tool
+        } else {
+            // Default to pen tool
+            canvasView.tool = PKInkingTool(.pen, color: .black, width: 5.0)
+        }
         
         // Set initial content size
         scrollView.contentSize = whiteboard.contentSize
@@ -153,6 +166,12 @@ public struct WhiteboardCanvasDataView: UIViewRepresentable {
         // Update drawing
         if canvasView.drawing != whiteboard.drawing {
             canvasView.drawing = whiteboard.drawing
+        }
+        
+        // Update tool if provided
+        if let tool = currentTool {
+            // Always update tool to ensure color/width changes are applied
+            canvasView.tool = tool
         }
         
         // Update content size if it changed

@@ -20,6 +20,9 @@ public struct DocumentCanvasDataView: UIViewRepresentable {
     /// Canvas settings
     public var settings: CanvasSettings = CanvasSettings()
     
+    /// Current tool (optional - if not provided, uses default pen)
+    public var currentTool: PKTool?
+    
     /// Callbacks
     public var onDrawingChanged: ((PKDrawing) -> Void)?
     public var onPageChanged: ((Int) -> Void)?
@@ -44,6 +47,7 @@ public struct DocumentCanvasDataView: UIViewRepresentable {
     public init(
         canvasData: Binding<Data>,
         settings: CanvasSettings = CanvasSettings(),
+        currentTool: PKTool? = nil,
         onDrawingChanged: ((PKDrawing) -> Void)? = nil,
         onPageChanged: ((Int) -> Void)? = nil,
         onZoomChanged: ((CGFloat) -> Void)? = nil,
@@ -52,6 +56,7 @@ public struct DocumentCanvasDataView: UIViewRepresentable {
     ) {
         self._canvasData = canvasData
         self.settings = settings
+        self.currentTool = currentTool
         self.onDrawingChanged = onDrawingChanged
         self.onPageChanged = onPageChanged
         self.onZoomChanged = onZoomChanged
@@ -81,6 +86,14 @@ public struct DocumentCanvasDataView: UIViewRepresentable {
         canvasView.drawingPolicy = settings.enablePalmRejection ? .pencilOnly : .anyInput
         canvasView.isOpaque = true
         canvasView.backgroundColor = UIColor.white
+        
+        // Set initial tool if provided
+        if let tool = currentTool {
+            canvasView.tool = tool
+        } else {
+            // Default to pen tool
+            canvasView.tool = PKInkingTool(.pen, color: .black, width: 5.0)
+        }
         
         // Get current page size - ensure we have at least one page
         let pageSize: CGSize
@@ -181,6 +194,12 @@ public struct DocumentCanvasDataView: UIViewRepresentable {
             if canvasView.drawing != currentDrawing {
                 canvasView.drawing = currentDrawing
             }
+        }
+        
+        // Update tool if provided
+        if let tool = currentTool {
+            // Always update tool to ensure color/width changes are applied
+            canvasView.tool = tool
         }
         
         // Update settings

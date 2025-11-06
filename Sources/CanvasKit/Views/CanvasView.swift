@@ -78,6 +78,7 @@ public struct CanvasView: View {
             WhiteboardCanvasDataView(
                 canvasData: $canvasData,
                 settings: settings,
+                currentTool: currentTool,
                 onDrawingChanged: { drawing in
                     updateDrawing(drawing)
                 },
@@ -114,7 +115,12 @@ public struct CanvasView: View {
                     isVisible: $isToolbarVisible,
                     onToolChanged: { tool in
                         currentTool = tool
-                        updateTool()
+                        // Update instrument if it's an inking tool
+                        if let inkingTool = tool as? PKInkingTool {
+                            instrument = inkingTool.inkType
+                            inkColor = inkingTool.color
+                            inkWidth = inkingTool.width
+                        }
                     },
                     onUndo: {
                         undo()
@@ -149,13 +155,38 @@ public struct CanvasView: View {
             // Update undo/redo state when data changes
             updateUndoRedoState()
         }
+        .onChange(of: inkColor) { _, _ in
+            // Recreate tool with new color
+            recreateTool()
+        }
+        .onChange(of: inkWidth) { _, _ in
+            // Recreate tool with new width
+            recreateTool()
+        }
+        .onChange(of: instrument) { _, _ in
+            // Recreate tool with new instrument type
+            recreateTool()
+        }
     }
     
     // MARK: - Private Methods
     
     private func updateTool() {
-        // Tool will be set by the wrapper view that has access to the canvas
-        // This is a placeholder for future implementation
+        // Tool is passed to WhiteboardCanvasDataView via currentTool property
+        // The view will update the canvas tool in updateUIView
+        recreateTool()
+    }
+    
+    private func recreateTool() {
+        // Recreate tool with current settings
+        if currentTool is PKInkingTool {
+            currentTool = PKInkingTool(instrument, color: inkColor, width: inkWidth)
+        } else if currentTool is PKEraserTool {
+            // Keep eraser as is
+        } else {
+            // Default to pen
+            currentTool = PKInkingTool(instrument, color: inkColor, width: inkWidth)
+        }
     }
     
     private func updateDrawing(_ drawing: PKDrawing) {
