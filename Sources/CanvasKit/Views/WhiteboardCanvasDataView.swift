@@ -200,6 +200,7 @@ public struct WhiteboardCanvasDataView: UIViewRepresentable {
             super.init(parent: nil)
         }
         
+        @MainActor
         @objc func resetZoom(_ gesture: UITapGestureRecognizer) {
             guard let scrollView = gesture.view as? UIScrollView else { return }
             UIView.animate(withDuration: 0.3) {
