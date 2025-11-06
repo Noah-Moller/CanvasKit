@@ -201,14 +201,16 @@ public struct NotebookView: View {
         var updatedDocument = document
         if updatedDocument.pages.indices.contains(currentPageIndex) {
             updatedDocument.pages[currentPageIndex].drawing = PKDrawing()
-            document = updatedDocument
+            canvasData = updatedDocument.toData()
+            onDataChanged?(canvasData)
         }
     }
     
     private func addPage() {
         var updatedDocument = document
         updatedDocument.addPage()
-        document = updatedDocument
+        canvasData = updatedDocument.toData()
+        onDataChanged?(canvasData)
         currentPageIndex = updatedDocument.pageCount - 1
         onPageChanged?(currentPageIndex)
     }
@@ -217,7 +219,8 @@ public struct NotebookView: View {
         guard document.pageCount > 1 else { return }
         var updatedDocument = document
         updatedDocument.removePage(at: currentPageIndex)
-        document = updatedDocument
+        canvasData = updatedDocument.toData()
+        onDataChanged?(canvasData)
         
         if currentPageIndex >= updatedDocument.pageCount {
             currentPageIndex = updatedDocument.pageCount - 1

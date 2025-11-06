@@ -181,13 +181,15 @@ public struct CanvasView: View {
     private func clearCanvas() {
         var updatedWhiteboard = whiteboard
         updatedWhiteboard.drawing = PKDrawing()
-        whiteboard = updatedWhiteboard
+        canvasData = updatedWhiteboard.toData()
+        onDataChanged?(canvasData)
     }
     
     private func toggleGrid() {
         var updatedWhiteboard = whiteboard
         updatedWhiteboard.showGrid.toggle()
-        whiteboard = updatedWhiteboard
+        canvasData = updatedWhiteboard.toData()
+        onDataChanged?(canvasData)
         showGrid = updatedWhiteboard.showGrid
     }
     

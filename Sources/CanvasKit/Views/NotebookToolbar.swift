@@ -332,7 +332,7 @@ public struct NotebookToolbar: View {
     
     public init(
         currentTool: Binding<PKTool>,
-        inkColor: Binding<UIColor> = .constant(.black),
+        inkColor: Binding<Any> = .constant(0),
         inkWidth: Binding<CGFloat> = .constant(5.0),
         instrument: Binding<PKInkingTool.InkType> = .constant(.pen),
         canUndo: Binding<Bool> = .constant(false),
