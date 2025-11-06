@@ -106,15 +106,17 @@ public struct DocumentCanvasDataView: UIViewRepresentable {
         context.coordinator.canvasView = canvasView
         
         // Set up drawing change callback to update Data binding
-        context.coordinator.documentView = self
-        context.coordinator.onDrawingChangedCallback = { [weak coordinator] drawing in
-            guard let coordinator = coordinator,
-                  let documentView = coordinator.documentView else { return }
+        let currentPageIdx = currentPageIndex
+        let canvasDataBinding = _canvasData
+        context.coordinator.onDrawingChangedCallback = { drawing in
             // Update the document's current page drawing
-            var updatedDocument = documentView.document
-            if updatedDocument.pages.indices.contains(documentView.currentPageIndex) {
-                updatedDocument.pages[documentView.currentPageIndex].drawing = drawing
-                documentView.canvasData = updatedDocument.toData()
+            var updatedDocument = DocumentCanvasDataView(
+                canvasData: canvasDataBinding,
+                settings: settings
+            ).document
+            if updatedDocument.pages.indices.contains(currentPageIdx) {
+                updatedDocument.pages[currentPageIdx].drawing = drawing
+                canvasDataBinding.wrappedValue = updatedDocument.toData()
             }
         }
         
@@ -160,37 +162,41 @@ public struct DocumentCanvasDataView: UIViewRepresentable {
         context.coordinator.canvasView = canvasView
         
         // Update drawing change callback
-        context.coordinator.documentView = self
-        context.coordinator.onDrawingChangedCallback = { [weak coordinator] drawing in
-            guard let coordinator = coordinator,
-                  let documentView = coordinator.documentView else { return }
-            var updatedDocument = documentView.document
-            if updatedDocument.pages.indices.contains(documentView.currentPageIndex) {
-                updatedDocument.pages[documentView.currentPageIndex].drawing = drawing
-                documentView.canvasData = updatedDocument.toData()
+        let currentPageIdx = currentPageIndex
+        let canvasDataBinding = _canvasData
+        context.coordinator.onDrawingChangedCallback = { drawing in
+            // Update the document's current page drawing
+            var updatedDocument = DocumentCanvasDataView(
+                canvasData: canvasDataBinding,
+                settings: settings
+            ).document
+            if updatedDocument.pages.indices.contains(currentPageIdx) {
+                updatedDocument.pages[currentPageIdx].drawing = drawing
+                canvasDataBinding.wrappedValue = updatedDocument.toData()
             }
         }
     }
     
     public func makeCoordinator() -> Coordinator {
-        return Coordinator(parent: self)
+        let coordinator = Coordinator(parent: self)
+        coordinator.settings = settings
+        return coordinator
     }
     
     // MARK: - Coordinator
     
     public class Coordinator: CanvasCoordinator {
-        weak var documentView: DocumentCanvasDataView?
+        var settings: CanvasSettings = CanvasSettings()
         
         init(parent: DocumentCanvasDataView) {
-            self.documentView = parent
+            self.settings = parent.settings
             super.init(parent: nil)
         }
         
         @objc func resetZoom(_ gesture: UITapGestureRecognizer) {
-            guard let scrollView = gesture.view as? UIScrollView,
-                  let documentView = documentView else { return }
+            guard let scrollView = gesture.view as? UIScrollView else { return }
             UIView.animate(withDuration: 0.3) {
-                scrollView.zoomScale = documentView.settings.defaultZoom
+                scrollView.zoomScale = self.settings.defaultZoom
                 scrollView.contentOffset = CGPoint(x: 0, y: 0)
             }
         }
