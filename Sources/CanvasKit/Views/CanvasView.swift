@@ -65,7 +65,7 @@ public struct CanvasView: View {
         _currentTool = State(initialValue: PKInkingTool(.pen, color: .black, width: 5.0))
         
         // Initialize grid visibility from whiteboard
-        if let whiteboardData = WhiteboardCanvasData.fromData(canvasData) {
+        if let whiteboardData = WhiteboardCanvasData.fromData(canvasData.wrappedValue) {
             _showGrid = State(initialValue: whiteboardData.showGrid)
         }
     }

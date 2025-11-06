@@ -106,13 +106,15 @@ public struct DocumentCanvasDataView: UIViewRepresentable {
         context.coordinator.canvasView = canvasView
         
         // Set up drawing change callback to update Data binding
-        let parent = self
-        context.coordinator.onDrawingChangedCallback = { drawing in
+        context.coordinator.documentView = self
+        context.coordinator.onDrawingChangedCallback = { [weak coordinator] drawing in
+            guard let coordinator = coordinator,
+                  let documentView = coordinator.documentView else { return }
             // Update the document's current page drawing
-            var updatedDocument = parent.document
-            if updatedDocument.pages.indices.contains(parent.currentPageIndex) {
-                updatedDocument.pages[parent.currentPageIndex].drawing = drawing
-                parent.canvasData = updatedDocument.toData()
+            var updatedDocument = documentView.document
+            if updatedDocument.pages.indices.contains(documentView.currentPageIndex) {
+                updatedDocument.pages[documentView.currentPageIndex].drawing = drawing
+                documentView.canvasData = updatedDocument.toData()
             }
         }
         
@@ -158,12 +160,14 @@ public struct DocumentCanvasDataView: UIViewRepresentable {
         context.coordinator.canvasView = canvasView
         
         // Update drawing change callback
-        let parent = self
-        context.coordinator.onDrawingChangedCallback = { drawing in
-            var updatedDocument = parent.document
-            if updatedDocument.pages.indices.contains(parent.currentPageIndex) {
-                updatedDocument.pages[parent.currentPageIndex].drawing = drawing
-                parent.canvasData = updatedDocument.toData()
+        context.coordinator.documentView = self
+        context.coordinator.onDrawingChangedCallback = { [weak coordinator] drawing in
+            guard let coordinator = coordinator,
+                  let documentView = coordinator.documentView else { return }
+            var updatedDocument = documentView.document
+            if updatedDocument.pages.indices.contains(documentView.currentPageIndex) {
+                updatedDocument.pages[documentView.currentPageIndex].drawing = drawing
+                documentView.canvasData = updatedDocument.toData()
             }
         }
     }
@@ -175,17 +179,18 @@ public struct DocumentCanvasDataView: UIViewRepresentable {
     // MARK: - Coordinator
     
     public class Coordinator: CanvasCoordinator {
-        var parent: DocumentCanvasDataView
+        weak var documentView: DocumentCanvasDataView?
         
         init(parent: DocumentCanvasDataView) {
-            self.parent = parent
+            self.documentView = parent
             super.init(parent: nil)
         }
         
         @objc func resetZoom(_ gesture: UITapGestureRecognizer) {
-            guard let scrollView = gesture.view as? UIScrollView else { return }
+            guard let scrollView = gesture.view as? UIScrollView,
+                  let documentView = documentView else { return }
             UIView.animate(withDuration: 0.3) {
-                scrollView.zoomScale = self.parent.settings.defaultZoom
+                scrollView.zoomScale = documentView.settings.defaultZoom
                 scrollView.contentOffset = CGPoint(x: 0, y: 0)
             }
         }

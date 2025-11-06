@@ -122,10 +122,8 @@ public struct NotebookToolbar: View {
                 }
                 .padding(.horizontal, configuration.horizontalPadding)
                 .padding(.vertical, configuration.verticalPadding)
-                .background(
-                    Material.regular
-                        .shadow(color: .black.opacity(0.1), radius: configuration.shadowRadius)
-                )
+                .background(Material.regular)
+                .shadow(color: .black.opacity(0.1), radius: configuration.shadowRadius)
             }
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }

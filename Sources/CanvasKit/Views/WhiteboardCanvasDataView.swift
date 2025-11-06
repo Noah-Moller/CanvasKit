@@ -109,13 +109,15 @@ public struct WhiteboardCanvasDataView: UIViewRepresentable {
         context.coordinator.canvasView = canvasView
         
         // Set up drawing change callback to update Data binding
-        let parent = self
-        context.coordinator.onDrawingChangedCallback = { drawing in
-            var updatedWhiteboard = parent.whiteboard
+        context.coordinator.whiteboardView = self
+        context.coordinator.onDrawingChangedCallback = { [weak coordinator] drawing in
+            guard let coordinator = coordinator,
+                  let whiteboardView = coordinator.whiteboardView else { return }
+            var updatedWhiteboard = whiteboardView.whiteboard
             updatedWhiteboard.drawing = drawing
             // Expand content size if needed
             updatedWhiteboard.expandContentSizeIfNeeded()
-            parent.canvasData = updatedWhiteboard.toData()
+            whiteboardView.canvasData = updatedWhiteboard.toData()
         }
         
         // Add double tap gesture to reset zoom
@@ -166,13 +168,15 @@ public struct WhiteboardCanvasDataView: UIViewRepresentable {
         context.coordinator.canvasView = canvasView
         
         // Update drawing change callback
-        let parent = self
-        context.coordinator.onDrawingChangedCallback = { drawing in
-            var updatedWhiteboard = parent.whiteboard
+        context.coordinator.whiteboardView = self
+        context.coordinator.onDrawingChangedCallback = { [weak coordinator] drawing in
+            guard let coordinator = coordinator,
+                  let whiteboardView = coordinator.whiteboardView else { return }
+            var updatedWhiteboard = whiteboardView.whiteboard
             updatedWhiteboard.drawing = drawing
             // Expand content size if needed
             updatedWhiteboard.expandContentSizeIfNeeded()
-            parent.canvasData = updatedWhiteboard.toData()
+            whiteboardView.canvasData = updatedWhiteboard.toData()
         }
     }
     
@@ -183,17 +187,18 @@ public struct WhiteboardCanvasDataView: UIViewRepresentable {
     // MARK: - Coordinator
     
     public class Coordinator: CanvasCoordinator {
-        var parent: WhiteboardCanvasDataView
+        weak var whiteboardView: WhiteboardCanvasDataView?
         
         init(parent: WhiteboardCanvasDataView) {
-            self.parent = parent
+            self.whiteboardView = parent
             super.init(parent: nil)
         }
         
         @objc func resetZoom(_ gesture: UITapGestureRecognizer) {
-            guard let scrollView = gesture.view as? UIScrollView else { return }
+            guard let scrollView = gesture.view as? UIScrollView,
+                  let whiteboardView = whiteboardView else { return }
             UIView.animate(withDuration: 0.3) {
-                scrollView.zoomScale = self.parent.settings.defaultZoom
+                scrollView.zoomScale = whiteboardView.settings.defaultZoom
             }
         }
     }
