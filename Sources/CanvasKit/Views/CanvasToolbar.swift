@@ -91,37 +91,39 @@ public struct CanvasToolbar: View {
     public var body: some View {
         if isVisible {
             VStack(spacing: 0) {
-                // Main toolbar - compact and minimal
-                HStack(spacing: 12) {
-                    // Drawing tools
-                    toolSelectionView
-                    
-                    Divider()
-                        .frame(height: 30)
-                    
-                    // Color & Width presets (only for inking tools)
-                    if currentTool is PKInkingTool {
-                        colorPresetsView
+                // Main toolbar - compact and minimal, scrollable for smaller displays
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        // Drawing tools
+                        toolSelectionView
                         
                         Divider()
                             .frame(height: 30)
                         
-                        widthPresetsView
+                        // Color & Width presets (only for inking tools)
+                        if currentTool is PKInkingTool {
+                            colorPresetsView
+                            
+                            Divider()
+                                .frame(height: 30)
+                            
+                            widthPresetsView
+                            
+                            Divider()
+                                .frame(height: 30)
+                        }
                         
-                        Divider()
-                            .frame(height: 30)
+                        Spacer(minLength: 20)
+                        
+                        // Grid toggle
+                        gridToggleButton
+                        
+                        // Action buttons
+                        actionButtonsView
                     }
-                    
-                    Spacer()
-                    
-                    // Grid toggle
-                    gridToggleButton
-                    
-                    // Action buttons
-                    actionButtonsView
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
                 .background(Material.regular)
                 .shadow(color: .black.opacity(0.1), radius: 8, y: -2)
             }

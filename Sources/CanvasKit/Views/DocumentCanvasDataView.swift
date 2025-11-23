@@ -84,7 +84,7 @@ public struct DocumentCanvasDataView: UIViewRepresentable {
         // Configure canvas view
         canvasView.delegate = context.coordinator
         canvasView.drawingPolicy = settings.enablePalmRejection ? .pencilOnly : .anyInput
-        canvasView.isOpaque = false // Make transparent to show template beneath
+        canvasView.isOpaque = false
         canvasView.backgroundColor = .clear
         
         // Set initial tool if provided
@@ -121,22 +121,26 @@ public struct DocumentCanvasDataView: UIViewRepresentable {
         let templateView = PageTemplateBackgroundView(template: template, pageSize: pageSize)
         let hostingController = UIHostingController(rootView: templateView)
         hostingController.view.translatesAutoresizingMaskIntoConstraints = false
-        hostingController.view.backgroundColor = .clear
+        hostingController.view.backgroundColor = .white
+        hostingController.view.isUserInteractionEnabled = false // Don't intercept touches
         
-        // Add views to scroll view in correct order (template behind canvas)
-        scrollView.addSubview(hostingController.view)
+        // Add canvas first
         scrollView.addSubview(canvasView)
+        
+        // Add template view and send to back
+        scrollView.addSubview(hostingController.view)
+        scrollView.sendSubviewToBack(hostingController.view)
         
         // Set up constraints with proper page size for both views
         canvasView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            // Template background constraints
+            // Template background constraints (behind canvas)
             hostingController.view.topAnchor.constraint(equalTo: scrollView.topAnchor),
             hostingController.view.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
             hostingController.view.widthAnchor.constraint(equalToConstant: pageSize.width),
             hostingController.view.heightAnchor.constraint(equalToConstant: pageSize.height),
             
-            // Canvas view constraints (same position as template)
+            // Canvas view constraints (same position, on top)
             canvasView.topAnchor.constraint(equalTo: scrollView.topAnchor),
             canvasView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
             canvasView.widthAnchor.constraint(equalToConstant: pageSize.width),
