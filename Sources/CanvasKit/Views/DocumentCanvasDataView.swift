@@ -84,8 +84,8 @@ public struct DocumentCanvasDataView: UIViewRepresentable {
         // Configure canvas view
         canvasView.delegate = context.coordinator
         canvasView.drawingPolicy = settings.enablePalmRejection ? .pencilOnly : .anyInput
-        canvasView.isOpaque = true
-        canvasView.backgroundColor = UIColor.white
+        canvasView.isOpaque = false // Make transparent to show template beneath
+        canvasView.backgroundColor = .clear
         
         // Set initial tool if provided
         if let tool = currentTool {
@@ -95,29 +95,48 @@ public struct DocumentCanvasDataView: UIViewRepresentable {
             canvasView.tool = PKInkingTool(.pen, color: .black, width: 5.0)
         }
         
-        // Get current page size - ensure we have at least one page
+        // Get current page size and template - ensure we have at least one page
         let pageSize: CGSize
+        let template: PageTemplate
+        
         if document.pages.isEmpty {
             // If no pages, create one with default paper size
             var updatedDocument = document
             updatedDocument.pages = [PageData(pageNumber: 1, paperSize: document.paperSize)]
             pageSize = document.paperSize.cgSize
+            template = .blank
             canvasView.drawing = PKDrawing()
         } else if document.pages.indices.contains(currentPageIndex) {
             pageSize = document.pages[currentPageIndex].pageSize
+            template = document.pages[currentPageIndex].template
             canvasView.drawing = document.pages[currentPageIndex].drawing
         } else {
             // Fallback to first page or paper size
             pageSize = document.pages.first?.pageSize ?? document.paperSize.cgSize
+            template = document.pages.first?.template ?? .blank
             canvasView.drawing = document.pages.first?.drawing ?? PKDrawing()
         }
         
-        // Add canvas to scroll view
+        // Create template background view using UIHostingController
+        let templateView = PageTemplateBackgroundView(template: template, pageSize: pageSize)
+        let hostingController = UIHostingController(rootView: templateView)
+        hostingController.view.translatesAutoresizingMaskIntoConstraints = false
+        hostingController.view.backgroundColor = .clear
+        
+        // Add views to scroll view in correct order (template behind canvas)
+        scrollView.addSubview(hostingController.view)
         scrollView.addSubview(canvasView)
         
-        // Set up constraints with proper page size
+        // Set up constraints with proper page size for both views
         canvasView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
+            // Template background constraints
+            hostingController.view.topAnchor.constraint(equalTo: scrollView.topAnchor),
+            hostingController.view.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            hostingController.view.widthAnchor.constraint(equalToConstant: pageSize.width),
+            hostingController.view.heightAnchor.constraint(equalToConstant: pageSize.height),
+            
+            // Canvas view constraints (same position as template)
             canvasView.topAnchor.constraint(equalTo: scrollView.topAnchor),
             canvasView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
             canvasView.widthAnchor.constraint(equalToConstant: pageSize.width),
@@ -133,6 +152,7 @@ public struct DocumentCanvasDataView: UIViewRepresentable {
         
         // Store references in coordinator
         context.coordinator.canvasView = canvasView
+        context.coordinator.templateHostingController = hostingController
         
         // Set up drawing change callback to update Data binding
         let currentPageIdx = currentPageIndex
@@ -165,18 +185,33 @@ public struct DocumentCanvasDataView: UIViewRepresentable {
     }
     
     public func updateUIView(_ scrollView: UIScrollView, context: Context) {
-        guard let canvasView = scrollView.subviews.first as? PKCanvasView else { return }
+        // Find canvas view - it's the second subview (template is first)
+        guard let canvasView = scrollView.subviews.compactMap({ $0 as? PKCanvasView }).first else { return }
         
-        // Update page size if needed - ensure we have at least one page
+        // Update page size and template if needed - ensure we have at least one page
         let pageSize: CGSize
+        let template: PageTemplate
+        
         if document.pages.isEmpty {
             // If no pages, use paper size
             pageSize = document.paperSize.cgSize
+            template = .blank
         } else if document.pages.indices.contains(currentPageIndex) {
             pageSize = document.pages[currentPageIndex].pageSize
+            template = document.pages[currentPageIndex].template
         } else {
             // Fallback to first page or paper size
             pageSize = document.pages.first?.pageSize ?? document.paperSize.cgSize
+            template = document.pages.first?.template ?? .blank
+        }
+        
+        // Update template background if needed
+        if let templateHostingController = context.coordinator.templateHostingController {
+            // Check if template changed - update the root view
+            let currentTemplate = templateHostingController.rootView.template
+            if currentTemplate != template || templateHostingController.rootView.pageSize != pageSize {
+                templateHostingController.rootView = PageTemplateBackgroundView(template: template, pageSize: pageSize)
+            }
         }
         
         // Update canvas view constraints if page size changed
@@ -184,6 +219,13 @@ public struct DocumentCanvasDataView: UIViewRepresentable {
            widthConstraint.constant != pageSize.width {
             widthConstraint.constant = pageSize.width
             canvasView.constraints.first(where: { $0.firstAttribute == .height })?.constant = pageSize.height
+            
+            // Also update template view constraints
+            if let templateView = context.coordinator.templateHostingController?.view {
+                templateView.constraints.first(where: { $0.firstAttribute == .width })?.constant = pageSize.width
+                templateView.constraints.first(where: { $0.firstAttribute == .height })?.constant = pageSize.height
+            }
+            
             // Update content size when page size changes
             scrollView.contentSize = pageSize
         }

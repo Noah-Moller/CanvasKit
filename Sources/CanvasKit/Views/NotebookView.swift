@@ -152,6 +152,9 @@ public struct NotebookView: View {
                     onPageChanged: { pageIndex in
                         goToPage(pageIndex)
                     },
+                    onTemplateChanged: { template in
+                        updateCurrentPageTemplate(template)
+                    },
                     onZoomIn: {
                         zoomIn()
                     },
@@ -258,6 +261,15 @@ public struct NotebookView: View {
         guard pageIndex >= 0 && pageIndex < document.pageCount else { return }
         currentPageIndex = pageIndex
         onPageChanged?(pageIndex)
+    }
+    
+    private func updateCurrentPageTemplate(_ template: PageTemplate) {
+        var updatedDocument = document
+        if updatedDocument.pages.indices.contains(currentPageIndex) {
+            updatedDocument.pages[currentPageIndex].template = template
+            canvasData = updatedDocument.toData()
+            onDataChanged?(canvasData)
+        }
     }
     
     private func zoomIn() {

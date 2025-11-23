@@ -30,6 +30,9 @@ public class CanvasCoordinator: NSObject {
     /// Weak reference to canvas view for tool management
     public weak var canvasView: PKCanvasView?
     
+    /// Template background hosting controller (for document canvases)
+    public var templateHostingController: UIHostingController<PageTemplateBackgroundView>?
+    
     /// Current zoom scale
     public var currentZoomScale: CGFloat = 1.0
     

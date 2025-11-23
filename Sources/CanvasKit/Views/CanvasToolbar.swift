@@ -4,18 +4,19 @@ import PencilKit
 #if canImport(UIKit)
 import UIKit
 
-/// Toolbar for canvas/whiteboard mode
+/// Minimal, GoodNotes-inspired toolbar for canvas/whiteboard mode
+/// Uses preset-based color and width selection for quick access
 public struct CanvasToolbar: View {
     // MARK: - Properties
     
     /// Current tool
     @Binding public var currentTool: PKTool
     
-    /// Current ink color
-    @Binding public var inkColor: UIColor
+    /// Selected color preset index
+    @State private var selectedColorIndex: Int = 0
     
-    /// Current ink width
-    @Binding public var inkWidth: CGFloat
+    /// Selected width preset
+    @State private var selectedWidth: ToolPresets.StrokeWidth = .medium
     
     /// Current instrument type
     @Binding public var instrument: PKInkingTool.InkType
@@ -65,8 +66,6 @@ public struct CanvasToolbar: View {
         onZoomReset: (() -> Void)? = nil
     ) {
         self._currentTool = currentTool
-        self._inkColor = inkColor
-        self._inkWidth = inkWidth
         self._instrument = instrument
         self._canUndo = canUndo
         self._canRedo = canRedo
@@ -81,6 +80,10 @@ public struct CanvasToolbar: View {
         self.onZoomIn = onZoomIn
         self.onZoomOut = onZoomOut
         self.onZoomReset = onZoomReset
+        
+        // Initialize selected color and width from provided values
+        _selectedColorIndex = State(initialValue: ToolPresets.closestColorIndex(for: inkColor.wrappedValue))
+        _selectedWidth = State(initialValue: ToolPresets.closestWidth(for: inkWidth.wrappedValue))
     }
     
     // MARK: - Body
@@ -88,62 +91,70 @@ public struct CanvasToolbar: View {
     public var body: some View {
         if isVisible {
             VStack(spacing: 0) {
-                // Main toolbar
-                HStack(spacing: configuration.spacing) {
-                    // Tool selection
+                // Main toolbar - compact and minimal
+                HStack(spacing: 12) {
+                    // Drawing tools
                     toolSelectionView
                     
-                    // Ink controls
+                    Divider()
+                        .frame(height: 30)
+                    
+                    // Color & Width presets (only for inking tools)
                     if currentTool is PKInkingTool {
-                        inkControlsView
+                        colorPresetsView
+                        
+                        Divider()
+                            .frame(height: 30)
+                        
+                        widthPresetsView
+                        
+                        Divider()
+                            .frame(height: 30)
                     }
                     
                     Spacer()
                     
-                    // Zoom controls
-                    zoomControlsView
-                    
                     // Grid toggle
-                    gridToggleView
+                    gridToggleButton
                     
                     // Action buttons
                     actionButtonsView
                 }
-                .padding(.horizontal, configuration.horizontalPadding)
-                .padding(.vertical, configuration.verticalPadding)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
                 .background(Material.regular)
-                .shadow(color: .black.opacity(0.1), radius: configuration.shadowRadius)
+                .shadow(color: .black.opacity(0.1), radius: 8, y: -2)
             }
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
     }
     
-    // MARK: - Tool Selection
+    // MARK: - Drawing Tools
     
     private var toolSelectionView: some View {
-        HStack(spacing: 8) {
-            // Pen tool
+        HStack(spacing: 6) {
+            // Pen
             toolButton(
-                tool: PKInkingTool(.pen, color: inkColor, width: inkWidth),
+                tool: createTool(type: .pen),
                 icon: "pencil",
                 isSelected: currentTool is PKInkingTool && instrument == .pen
             )
             
-            // Pencil tool
+            // Marker (highlighter)
             toolButton(
-                tool: PKInkingTool(.pencil, color: inkColor, width: inkWidth),
-                icon: "pencil.circle",
-                isSelected: currentTool is PKInkingTool && instrument == .pencil
-            )
-            
-            // Marker tool
-            toolButton(
-                tool: PKInkingTool(.marker, color: inkColor, width: inkWidth),
+                tool: createTool(type: .marker),
                 icon: "highlighter",
                 isSelected: currentTool is PKInkingTool && instrument == .marker
             )
             
-            // Eraser tool
+            // Lasso (selection)
+            toolButton(
+                tool: PKLassoTool(),
+                icon: "lasso",
+                isSelected: currentTool is PKLassoTool
+            )
+            
+            // Eraser
             toolButton(
                 tool: PKEraserTool(.bitmap),
                 icon: "eraser",
@@ -152,61 +163,87 @@ public struct CanvasToolbar: View {
         }
     }
     
-    // MARK: - Ink Controls
+    // MARK: - Color Presets
     
-    private var inkControlsView: some View {
-        HStack(spacing: 12) {
-            // Color picker
-            ColorPicker("Ink Color", selection: Binding(
-                get: { Color(inkColor) },
-                set: { inkColor = UIColor($0) }
-            ))
-            .labelsHidden()
-            .frame(width: 30, height: 30)
-            
-            // Width slider
-            VStack(spacing: 2) {
-                Text("Width")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-                
-                Slider(value: $inkWidth, in: 1...20, step: 1)
-                    .frame(width: 80)
+    private var colorPresetsView: some View {
+        HStack(spacing: 4) {
+            ForEach(0..<ToolPresets.colors.count, id: \.self) { index in
+                colorPresetButton(colorIndex: index)
             }
         }
     }
     
-    // MARK: - Zoom Controls
-    
-    private var zoomControlsView: some View {
-        HStack(spacing: 4) {
-            Button(action: { onZoomOut?() }) {
-                Image(systemName: "minus.magnifyingglass")
-                    .font(.system(size: 16, weight: .medium))
-            }
-            .buttonStyle(.plain)
-            
-            Button(action: { onZoomReset?() }) {
-                Image(systemName: "1.magnifyingglass")
-                    .font(.system(size: 16, weight: .medium))
-            }
-            .buttonStyle(.plain)
-            
-            Button(action: { onZoomIn?() }) {
-                Image(systemName: "plus.magnifyingglass")
-                    .font(.system(size: 16, weight: .medium))
-            }
-            .buttonStyle(.plain)
+    private func colorPresetButton(colorIndex: Int) -> some View {
+        let color = ToolPresets.colors[colorIndex]
+        let isSelected = selectedColorIndex == colorIndex
+        
+        return Button(action: {
+            selectedColorIndex = colorIndex
+            updateToolWithCurrentSettings()
+        }) {
+            Circle()
+                .fill(Color(color))
+                .frame(width: 24, height: 24)
+                .overlay(
+                    Circle()
+                        .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 2)
+                )
+                .overlay(
+                    Circle()
+                        .stroke(Color.primary.opacity(0.2), lineWidth: 0.5)
+                )
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel(ToolPresets.colorNames[colorIndex])
+    }
+    
+    // MARK: - Width Presets
+    
+    private var widthPresetsView: some View {
+        HStack(spacing: 6) {
+            ForEach(ToolPresets.StrokeWidth.allCases) { width in
+                widthPresetButton(width: width)
+            }
+        }
+    }
+    
+    private func widthPresetButton(width: ToolPresets.StrokeWidth) -> some View {
+        let isSelected = selectedWidth == width
+        
+        return Button(action: {
+            selectedWidth = width
+            updateToolWithCurrentSettings()
+        }) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isSelected ? Color.blue.opacity(0.15) : Color.clear)
+                    .frame(width: 32, height: 32)
+                
+                Circle()
+                    .fill(Color.primary)
+                    .frame(width: width.iconSize, height: width.iconSize)
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 2)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(width.displayName)
     }
     
     // MARK: - Grid Toggle
     
-    private var gridToggleView: some View {
+    private var gridToggleButton: some View {
         Button(action: { onToggleGrid?() }) {
-            Image(systemName: showGrid ? "grid" : "grid")
+            Image(systemName: "grid")
                 .font(.system(size: 16, weight: .medium))
                 .foregroundColor(showGrid ? .blue : .primary)
+                .frame(width: 32, height: 32)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(showGrid ? Color.blue.opacity(0.15) : Color.clear)
+                )
         }
         .buttonStyle(.plain)
     }
@@ -215,23 +252,25 @@ public struct CanvasToolbar: View {
     
     private var actionButtonsView: some View {
         HStack(spacing: 8) {
-            // Undo button
+            // Undo
             Button(action: { onUndo?() }) {
                 Image(systemName: "arrow.uturn.backward")
                     .font(.system(size: 16, weight: .medium))
             }
             .disabled(!canUndo)
             .buttonStyle(.plain)
+            .opacity(canUndo ? 1.0 : 0.3)
             
-            // Redo button
+            // Redo
             Button(action: { onRedo?() }) {
                 Image(systemName: "arrow.uturn.forward")
                     .font(.system(size: 16, weight: .medium))
             }
             .disabled(!canRedo)
             .buttonStyle(.plain)
+            .opacity(canRedo ? 1.0 : 0.3)
             
-            // Clear button
+            // Clear
             Button(action: { onClear?() }) {
                 Image(systemName: "trash")
                     .font(.system(size: 16, weight: .medium))
@@ -261,10 +300,27 @@ public struct CanvasToolbar: View {
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(isSelected ? Color.clear : Color.primary.opacity(0.3), lineWidth: 1)
+                        .stroke(isSelected ? Color.clear : Color.primary.opacity(0.2), lineWidth: 1)
                 )
         }
         .buttonStyle(.plain)
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func createTool(type: PKInkingTool.InkType) -> PKInkingTool {
+        let color = ToolPresets.colors[selectedColorIndex]
+        let width = selectedWidth.rawValue
+        return PKInkingTool(type, color: color, width: width)
+    }
+    
+    private func updateToolWithCurrentSettings() {
+        // Only update if we're using an inking tool
+        guard currentTool is PKInkingTool else { return }
+        
+        let newTool = createTool(type: instrument)
+        currentTool = newTool
+        onToolChanged?(newTool)
     }
 }
 

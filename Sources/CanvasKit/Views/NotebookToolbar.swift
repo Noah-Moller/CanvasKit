@@ -4,18 +4,19 @@ import PencilKit
 #if canImport(UIKit)
 import UIKit
 
-/// Toolbar for notebook/document canvas mode
+/// Minimal, GoodNotes-inspired toolbar for notebook/document canvas mode
+/// Uses preset-based color and width selection for quick access
 public struct NotebookToolbar: View {
     // MARK: - Properties
     
     /// Current tool
     @Binding public var currentTool: PKTool
     
-    /// Current ink color
-    @Binding public var inkColor: UIColor
+    /// Selected color preset index
+    @State private var selectedColorIndex: Int = 0
     
-    /// Current ink width
-    @Binding public var inkWidth: CGFloat
+    /// Selected width preset
+    @State private var selectedWidth: ToolPresets.StrokeWidth = .medium
     
     /// Current instrument type
     @Binding public var instrument: PKInkingTool.InkType
@@ -30,6 +31,9 @@ public struct NotebookToolbar: View {
     /// Total page count
     public var pageCount: Int
     
+    /// Show template selector
+    @State private var showTemplateSelector = false
+    
     /// Callbacks
     public var onToolChanged: ((PKTool) -> Void)?
     public var onUndo: (() -> Void)?
@@ -38,6 +42,7 @@ public struct NotebookToolbar: View {
     public var onAddPage: (() -> Void)?
     public var onRemovePage: (() -> Void)?
     public var onPageChanged: ((Int) -> Void)?
+    public var onTemplateChanged: ((PageTemplate) -> Void)?
     public var onZoomIn: (() -> Void)?
     public var onZoomOut: (() -> Void)?
     public var onZoomReset: (() -> Void)?
@@ -68,13 +73,12 @@ public struct NotebookToolbar: View {
         onAddPage: (() -> Void)? = nil,
         onRemovePage: (() -> Void)? = nil,
         onPageChanged: ((Int) -> Void)? = nil,
+        onTemplateChanged: ((PageTemplate) -> Void)? = nil,
         onZoomIn: (() -> Void)? = nil,
         onZoomOut: (() -> Void)? = nil,
         onZoomReset: (() -> Void)? = nil
     ) {
         self._currentTool = currentTool
-        self._inkColor = inkColor
-        self._inkWidth = inkWidth
         self._instrument = instrument
         self._canUndo = canUndo
         self._canRedo = canRedo
@@ -89,9 +93,14 @@ public struct NotebookToolbar: View {
         self.onAddPage = onAddPage
         self.onRemovePage = onRemovePage
         self.onPageChanged = onPageChanged
+        self.onTemplateChanged = onTemplateChanged
         self.onZoomIn = onZoomIn
         self.onZoomOut = onZoomOut
         self.onZoomReset = onZoomReset
+        
+        // Initialize selected color and width from provided values
+        _selectedColorIndex = State(initialValue: ToolPresets.closestColorIndex(for: inkColor.wrappedValue))
+        _selectedWidth = State(initialValue: ToolPresets.closestWidth(for: inkWidth.wrappedValue))
     }
     
     // MARK: - Body
@@ -99,62 +108,76 @@ public struct NotebookToolbar: View {
     public var body: some View {
         if isVisible {
             VStack(spacing: 0) {
-                // Main toolbar
-                HStack(spacing: configuration.spacing) {
-                    // Tool selection
+                // Main toolbar - compact and minimal
+                HStack(spacing: 12) {
+                    // Drawing tools
                     toolSelectionView
                     
-                    // Ink controls
+                    Divider()
+                        .frame(height: 30)
+                    
+                    // Color & Width presets (only for inking tools)
                     if currentTool is PKInkingTool {
-                        inkControlsView
+                        colorPresetsView
+                        
+                        Divider()
+                            .frame(height: 30)
+                        
+                        widthPresetsView
+                        
+                        Divider()
+                            .frame(height: 30)
                     }
                     
                     Spacer()
                     
-                    // Zoom controls
-                    zoomControlsView
+                    // Page navigation
+                    pageNavigationView
                     
-                    // Page controls
-                    pageControlsView
+                    // Template selector
+                    templateButton
                     
                     // Action buttons
                     actionButtonsView
                 }
-                .padding(.horizontal, configuration.horizontalPadding)
-                .padding(.vertical, configuration.verticalPadding)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
                 .background(Material.regular)
-                .shadow(color: .black.opacity(0.1), radius: configuration.shadowRadius)
+                .shadow(color: .black.opacity(0.1), radius: 8, y: -2)
             }
             .transition(.move(edge: .bottom).combined(with: .opacity))
+            .sheet(isPresented: $showTemplateSelector) {
+                templateSelectorSheet
+            }
         }
     }
     
-    // MARK: - Tool Selection
+    // MARK: - Drawing Tools
     
     private var toolSelectionView: some View {
-        HStack(spacing: 8) {
-            // Pen tool
+        HStack(spacing: 6) {
+            // Pen
             toolButton(
-                tool: PKInkingTool(.pen, color: inkColor, width: inkWidth),
+                tool: createTool(type: .pen),
                 icon: "pencil",
                 isSelected: currentTool is PKInkingTool && instrument == .pen
             )
             
-            // Pencil tool
+            // Marker (highlighter)
             toolButton(
-                tool: PKInkingTool(.pencil, color: inkColor, width: inkWidth),
-                icon: "pencil.circle",
-                isSelected: currentTool is PKInkingTool && instrument == .pencil
-            )
-            
-            // Marker tool
-            toolButton(
-                tool: PKInkingTool(.marker, color: inkColor, width: inkWidth),
+                tool: createTool(type: .marker),
                 icon: "highlighter",
                 isSelected: currentTool is PKInkingTool && instrument == .marker
             )
             
-            // Eraser tool
+            // Lasso (selection)
+            toolButton(
+                tool: PKLassoTool(),
+                icon: "lasso",
+                isSelected: currentTool is PKLassoTool
+            )
+            
+            // Eraser
             toolButton(
                 tool: PKEraserTool(.bitmap),
                 icon: "eraser",
@@ -163,58 +186,79 @@ public struct NotebookToolbar: View {
         }
     }
     
-    // MARK: - Ink Controls
+    // MARK: - Color Presets
     
-    private var inkControlsView: some View {
-        HStack(spacing: 12) {
-            // Color picker
-            ColorPicker("Ink Color", selection: Binding(
-                get: { Color(inkColor) },
-                set: { inkColor = UIColor($0) }
-            ))
-            .labelsHidden()
-            .frame(width: 30, height: 30)
-            
-            // Width slider
-            VStack(spacing: 2) {
-                Text("Width")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-                
-                Slider(value: $inkWidth, in: 1...20, step: 1)
-                    .frame(width: 80)
-            }
-        }
-    }
-    
-    // MARK: - Zoom Controls
-    
-    private var zoomControlsView: some View {
+    private var colorPresetsView: some View {
         HStack(spacing: 4) {
-            Button(action: { onZoomOut?() }) {
-                Image(systemName: "minus.magnifyingglass")
-                    .font(.system(size: 16, weight: .medium))
+            ForEach(0..<ToolPresets.colors.count, id: \.self) { index in
+                colorPresetButton(colorIndex: index)
             }
-            .buttonStyle(.plain)
-            
-            Button(action: { onZoomReset?() }) {
-                Image(systemName: "1.magnifyingglass")
-                    .font(.system(size: 16, weight: .medium))
-            }
-            .buttonStyle(.plain)
-            
-            Button(action: { onZoomIn?() }) {
-                Image(systemName: "plus.magnifyingglass")
-                    .font(.system(size: 16, weight: .medium))
-            }
-            .buttonStyle(.plain)
         }
     }
     
-    // MARK: - Page Controls
+    private func colorPresetButton(colorIndex: Int) -> some View {
+        let color = ToolPresets.colors[colorIndex]
+        let isSelected = selectedColorIndex == colorIndex
+        
+        return Button(action: {
+            selectedColorIndex = colorIndex
+            updateToolWithCurrentSettings()
+        }) {
+            Circle()
+                .fill(Color(color))
+                .frame(width: 24, height: 24)
+                .overlay(
+                    Circle()
+                        .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 2)
+                )
+                .overlay(
+                    Circle()
+                        .stroke(Color.primary.opacity(0.2), lineWidth: 0.5)
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(ToolPresets.colorNames[colorIndex])
+    }
     
-    private var pageControlsView: some View {
-        HStack(spacing: 8) {
+    // MARK: - Width Presets
+    
+    private var widthPresetsView: some View {
+        HStack(spacing: 6) {
+            ForEach(ToolPresets.StrokeWidth.allCases) { width in
+                widthPresetButton(width: width)
+            }
+        }
+    }
+    
+    private func widthPresetButton(width: ToolPresets.StrokeWidth) -> some View {
+        let isSelected = selectedWidth == width
+        
+        return Button(action: {
+            selectedWidth = width
+            updateToolWithCurrentSettings()
+        }) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isSelected ? Color.blue.opacity(0.15) : Color.clear)
+                    .frame(width: 32, height: 32)
+                
+                Circle()
+                    .fill(Color.primary)
+                    .frame(width: width.iconSize, height: width.iconSize)
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 2)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(width.displayName)
+    }
+    
+    // MARK: - Page Navigation
+    
+    private var pageNavigationView: some View {
+        HStack(spacing: 6) {
             // Previous page
             Button(action: {
                 if currentPageIndex > 0 {
@@ -222,16 +266,18 @@ public struct NotebookToolbar: View {
                 }
             }) {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 16, weight: .medium))
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(currentPageIndex > 0 ? .primary : .secondary)
+                    .frame(width: 28, height: 28)
             }
             .disabled(currentPageIndex <= 0)
             .buttonStyle(.plain)
             
             // Page indicator
             Text("\(currentPageIndex + 1)/\(pageCount)")
-                .font(.caption)
+                .font(.caption.monospacedDigit())
                 .foregroundColor(.secondary)
-                .frame(minWidth: 50)
+                .frame(minWidth: 45)
             
             // Next page
             Button(action: {
@@ -240,26 +286,89 @@ public struct NotebookToolbar: View {
                 }
             }) {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 16, weight: .medium))
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(currentPageIndex < pageCount - 1 ? .primary : .secondary)
+                    .frame(width: 28, height: 28)
             }
             .disabled(currentPageIndex >= pageCount - 1)
             .buttonStyle(.plain)
             
             // Add page
             Button(action: { onAddPage?() }) {
-                Image(systemName: "plus")
-                    .font(.system(size: 16, weight: .medium))
+                Image(systemName: "plus.circle.fill")
+                    .font(.system(size: 18))
+                    .foregroundColor(.blue)
             }
             .buttonStyle(.plain)
-            
-            // Remove page (only if more than 1 page)
-            if pageCount > 1 {
-                Button(action: { onRemovePage?() }) {
-                    Image(systemName: "minus")
-                        .font(.system(size: 16, weight: .medium))
+        }
+    }
+    
+    // MARK: - Template Selector
+    
+    private var templateButton: some View {
+        Button(action: { showTemplateSelector = true }) {
+            Image(systemName: "doc.text")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(.primary)
+                .frame(width: 32, height: 32)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.primary.opacity(0.05))
+                )
+        }
+        .buttonStyle(.plain)
+    }
+    
+    private var templateSelectorSheet: some View {
+        NavigationStack {
+            List(PageTemplate.allCases) { template in
+                Button(action: {
+                    onTemplateChanged?(template)
+                    showTemplateSelector = false
+                }) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(template.displayName)
+                                .font(.headline)
+                            
+                            Text(templateDescription(for: template))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        // Preview thumbnail
+                        PageTemplateBackgroundView(template: template, pageSize: CGSize(width: 80, height: 110))
+                            .frame(width: 80, height: 110)
+                            .cornerRadius(4)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                            )
+                    }
                 }
-                .buttonStyle(.plain)
             }
+            .navigationTitle("Page Template")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        showTemplateSelector = false
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+    
+    private func templateDescription(for template: PageTemplate) -> String {
+        switch template {
+        case .blank: return "Clean blank page"
+        case .lined: return "Ruled lines for writing"
+        case .grid: return "Grid pattern for sketches"
+        case .dotted: return "Dots for bullet journaling"
+        case .cornell: return "Cornell note-taking system"
         }
     }
     
@@ -267,23 +376,25 @@ public struct NotebookToolbar: View {
     
     private var actionButtonsView: some View {
         HStack(spacing: 8) {
-            // Undo button
+            // Undo
             Button(action: { onUndo?() }) {
                 Image(systemName: "arrow.uturn.backward")
                     .font(.system(size: 16, weight: .medium))
             }
             .disabled(!canUndo)
             .buttonStyle(.plain)
+            .opacity(canUndo ? 1.0 : 0.3)
             
-            // Redo button
+            // Redo
             Button(action: { onRedo?() }) {
                 Image(systemName: "arrow.uturn.forward")
                     .font(.system(size: 16, weight: .medium))
             }
             .disabled(!canRedo)
             .buttonStyle(.plain)
+            .opacity(canRedo ? 1.0 : 0.3)
             
-            // Clear button
+            // Clear
             Button(action: { onClear?() }) {
                 Image(systemName: "trash")
                     .font(.system(size: 16, weight: .medium))
@@ -313,10 +424,27 @@ public struct NotebookToolbar: View {
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(isSelected ? Color.clear : Color.primary.opacity(0.3), lineWidth: 1)
+                        .stroke(isSelected ? Color.clear : Color.primary.opacity(0.2), lineWidth: 1)
                 )
         }
         .buttonStyle(.plain)
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func createTool(type: PKInkingTool.InkType) -> PKInkingTool {
+        let color = ToolPresets.colors[selectedColorIndex]
+        let width = selectedWidth.rawValue
+        return PKInkingTool(type, color: color, width: width)
+    }
+    
+    private func updateToolWithCurrentSettings() {
+        // Only update if we're using an inking tool
+        guard currentTool is PKInkingTool else { return }
+        
+        let newTool = createTool(type: instrument)
+        currentTool = newTool
+        onToolChanged?(newTool)
     }
 }
 
